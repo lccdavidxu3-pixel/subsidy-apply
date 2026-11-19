@@ -5,7 +5,8 @@
  * 1. 新建一個 Google 試算表 →「擴充功能 → Apps Script」，把這整份貼上（取代原本的內容）。
  * 2. 左側「專案設定（齒輪）→ 指令碼屬性」新增：
  *      ADMIN_PASSWORD    = 你的後台密碼
- *      ANTHROPIC_API_KEY = Claude API 金鑰（選填；有設定才會用 AI 辨識手寫／掃描的初審表）
+ *      GEMINI_API_KEY    = Google Gemini API 金鑰（選填；用 AI 辨識手寫／掃描的初審表，aistudio.google.com/apikey 取得）
+ *      ANTHROPIC_API_KEY = 或改用 Claude API 金鑰（兩個都設定時優先用 Gemini）
  * 3. 右上「部署 → 新增部署作業 → 類型：網頁應用程式」
  *      執行身分：我　／　誰可以存取：所有人 → 部署，第一次會要求授權（試算表 + 雲端硬碟）。
  * 4. 複製「網頁應用程式網址」，貼到 assets/common.js 最上面的 CONFIG.API_URL。
@@ -108,23 +109,52 @@ function status(req) {
   return { ok: true, app: publicView(rec) };
 }
 
-/* ---------------- AI 辨識初審表（手寫／掃描） ---------------- */
+/* ---------------- AI 辨識初審表（手寫／掃描） ----------------
+ * 指令碼屬性有 GEMINI_API_KEY → 用 Google Gemini；否則有 ANTHROPIC_API_KEY → 用 Claude。
+ * 要換 Gemini 模型可加屬性 GEMINI_MODEL（預設 gemini-flash-latest，找不到時改用 gemini-2.5-flash）。
+ */
 
-const AI_MODEL = 'claude-opus-5-5';
+const CLAUDE_MODEL = 'claude-opus-5-5';
+const GEMINI_DEFAULT_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash'];
 const AI_LIMIT_PER_10MIN = 40; // 全站每 10 分鐘最多辨識次數，避免被濫用
 
+const AI_FIELDS = {
+  q1: '第1題：是/否', q2: '第2題：是/否', q3: '第3題：是/否', q4: '第4題：是/否', q5: '第5題：是/否',
+  q6: '第6題：是/否', q7: '第7題：是/否', q8: '第8題：同意/不同意', q9: '第9題：同意/不同意', q10: '第10題：同意/不同意',
+  name: '姓名', gender: '男/女', marital: '已婚/未婚', birthDate: '西元 YYYY-MM-DD',
+  phoneHome: '市話(H)', mobile: '行動電話，只留數字', idNo: '身分證號碼', address: '聯絡地址',
+  military: '未役/役畢/免役', email: 'Mail', school: '學校名稱', dept: '科系',
+  motivation: '申請動機整段文字', confirm: '是/不是',
+};
+
+const AI_PROMPT = [
+  '這是一份「高階原廠補助資格審核表」，可能是手寫後掃描或拍照。請讀出申請人填寫的內容並依 JSON 格式回傳。',
+  '規則：',
+  '- q1~q10 對應「一.資格審核」第 1~10 題，看勾選（✓、V、☑、■、塗黑、圈選）在哪個選項；q1~q7 填「是」或「否」，q8~q10 填「同意」或「不同意」；看不出來就填空字串。',
+  '- gender 填「男」或「女」；marital 填「已婚」或「未婚」；military 填「未役」「役畢」「免役」其中之一。',
+  '- confirm：「已確定審核資格」後面勾選的是「是」或「不是」。',
+  '- birthDate 轉成西元 YYYY-MM-DD（民國年 + 1911，例如 84年12月12日 → 1995-12-12）。',
+  '- mobile 只留數字（09 開頭 10 碼）；phoneHome 保留原樣（含區碼、- 號）。',
+  '- idNo 為 1 個英文字母 + 9 個數字，英文大寫。',
+  '- school 只填學校名稱（不要「(學校)」字樣）；dept 為科系。',
+  '- motivation 為「為何會想申請專案」下方手寫的整段文字，保留原意、加上標點。',
+  '- 只讀申請人填寫的部分；「三.專案類別」「四.審核結果」是中心填寫的，忽略。',
+  '- 沒填或完全無法辨識的欄位填空字串，不要猜。',
+  '- uncertain：列出你辨識沒把握（字跡潦草、可能讀錯）的欄位名稱（例如 "dept"、"q4"）。',
+].join('\n');
+
 function extract(req) {
-  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
-  if (!key) return { ok: false, error: 'AI 辨識未設定', code: 'NO_AI' };
+  const props = PropertiesService.getScriptProperties();
+  const geminiKey = props.getProperty('GEMINI_API_KEY');
+  const claudeKey = props.getProperty('ANTHROPIC_API_KEY');
+  if (!geminiKey && !claudeKey) return { ok: false, error: 'AI 辨識未設定', code: 'NO_AI' };
 
   const m = /^data:([\w\/+.\-]+);base64,(.+)$/.exec(String((req.file || {}).dataUrl || ''));
   if (!m) throw new Error('檔案格式錯誤');
   const mime = m[1];
-  if (m[2].length > 14000000) throw new Error('檔案太大，請小於 10MB');
-  let block;
-  if (mime === 'application/pdf') block = { type: 'document', source: { type: 'base64', media_type: mime, data: m[2] } };
-  else if (/^image\/(jpeg|png|gif|webp)$/.test(mime)) block = { type: 'image', source: { type: 'base64', media_type: mime, data: m[2] } };
-  else throw new Error('AI 辨識只支援 PDF 或圖片');
+  const data = m[2];
+  if (data.length > 14000000) throw new Error('檔案太大，請小於 10MB');
+  if (mime !== 'application/pdf' && !/^image\/(jpeg|png|gif|webp)$/.test(mime)) throw new Error('AI 辨識只支援 PDF 或圖片');
 
   // 簡單限流
   const cache = CacheService.getScriptCache();
@@ -133,31 +163,63 @@ function extract(req) {
   if (used >= AI_LIMIT_PER_10MIN) throw new Error('目前辨識人數較多，請稍後再試或直接手動填寫');
   cache.put(slot, String(used + 1), 900);
 
-  const yn = { type: 'string', enum: ['是', '否', ''] };
-  const agree = { type: 'string', enum: ['同意', '不同意', ''] };
-  const str = { type: 'string' };
-  const props = {
-    q1: yn, q2: yn, q3: yn, q4: yn, q5: yn, q6: yn, q7: yn, q8: agree, q9: agree, q10: agree,
-    name: str, gender: { type: 'string', enum: ['男', '女', ''] }, marital: { type: 'string', enum: ['已婚', '未婚', ''] },
-    birthDate: str, phoneHome: str, mobile: str, idNo: str, address: str,
-    military: { type: 'string', enum: ['未役', '役畢', '免役', ''] }, email: str, school: str, dept: str,
-    motivation: str, confirm: { type: 'string', enum: ['是', '不是', ''] },
-    uncertain: { type: 'array', items: { type: 'string' } },
-  };
-  const prompt = [
-    '這是一份「高階原廠補助資格審核表」，可能是手寫後掃描或拍照。請讀出申請人填寫的內容並依 JSON 格式回傳。',
-    '規則：',
-    '- q1~q10 對應「一.資格審核」第 1~10 題，看勾選（✓、V、☑、■、塗黑、圈選）在哪個選項；看不出來就填空字串。',
-    '- confirm：「已確定審核資格」後面勾選的是「是」或「不是」。',
-    '- birthDate 轉成西元 YYYY-MM-DD（民國年 + 1911，例如 84年12月12日 → 1995-12-12）。',
-    '- mobile 只留數字（09 開頭 10 碼）；phoneHome 保留原樣（含區碼、- 號）。',
-    '- idNo 為 1 個英文字母 + 9 個數字，英文大寫。',
-    '- school 只填學校名稱（不要「(學校)」字樣）；dept 為科系。',
-    '- motivation 為「為何會想申請專案」下方手寫的整段文字，保留原意、加上標點。',
-    '- 只讀申請人填寫的部分；「三.專案類別」「四.審核結果」是中心填寫的，忽略。',
-    '- 沒填或完全無法辨識的欄位填空字串，不要猜。',
-    '- uncertain：列出你辨識沒把握（字跡潦草、可能讀錯）的欄位名稱。',
-  ].join('\n');
+  const text = geminiKey
+    ? callGemini(geminiKey, props.getProperty('GEMINI_MODEL'), mime, data)
+    : callClaude(claudeKey, mime, data);
+
+  let values;
+  try { values = JSON.parse(text); } catch (e) { throw new Error('AI 辨識結果格式錯誤，請手動填寫'); }
+  const uncertain = Array.isArray(values.uncertain) ? values.uncertain.map(String) : [];
+  const out = {};
+  Object.keys(AI_FIELDS).forEach(k => { const v = String(values[k] == null ? '' : values[k]).trim(); if (v) out[k] = v; });
+  return { ok: true, values: out, uncertain: uncertain };
+}
+
+function callGemini(key, model, mime, data) {
+  const schemaProps = {};
+  Object.keys(AI_FIELDS).forEach(k => { schemaProps[k] = { type: 'STRING', description: AI_FIELDS[k] }; });
+  schemaProps.uncertain = { type: 'ARRAY', items: { type: 'STRING' }, description: '辨識沒把握的欄位名稱' };
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: data } }, { text: AI_PROMPT }] }],
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+      responseSchema: { type: 'OBJECT', properties: schemaProps, required: Object.keys(schemaProps) },
+    },
+  });
+
+  const models = model ? [model] : GEMINI_DEFAULT_MODELS;
+  let res;
+  for (let i = 0; i < models.length; i++) {
+    res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(models[i]) + ':generateContent', {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      headers: { 'x-goog-api-key': key },
+      payload: body,
+    });
+    if (res.getResponseCode() !== 404) break; // 模型名稱不存在才換下一個
+  }
+
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    console.error('Gemini API ' + code + ': ' + res.getContentText());
+    if (code === 400 && /API key/i.test(res.getContentText())) throw new Error('Gemini 金鑰無效，請檢查 GEMINI_API_KEY');
+    throw new Error(code === 429 || code === 503 ? 'AI 辨識忙碌中，請稍後再試' : 'AI 辨識失敗（' + code + '）');
+  }
+  const json = JSON.parse(res.getContentText() || '{}');
+  const cand = (json.candidates || [])[0];
+  if (!cand || (json.promptFeedback && json.promptFeedback.blockReason)) throw new Error('AI 無法辨識這份檔案，請手動填寫');
+  return ((cand.content || {}).parts || []).map(p => p.text || '').join('');
+}
+
+function callClaude(key, mime, data) {
+  const block = mime === 'application/pdf'
+    ? { type: 'document', source: { type: 'base64', media_type: mime, data: data } }
+    : { type: 'image', source: { type: 'base64', media_type: mime, data: data } };
+  const props = {};
+  Object.keys(AI_FIELDS).forEach(k => { props[k] = { type: 'string', description: AI_FIELDS[k] }; });
+  props.uncertain = { type: 'array', items: { type: 'string' } };
 
   const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',
@@ -169,14 +231,14 @@ function extract(req) {
       'anthropic-beta': 'server-side-fallback-2026-07-01',
     },
     payload: JSON.stringify({
-      model: AI_MODEL,
+      model: CLAUDE_MODEL,
       max_tokens: 16000,
       fallbacks: 'default',
       output_config: {
         effort: 'low',
         format: { type: 'json_schema', schema: { type: 'object', properties: props, required: Object.keys(props), additionalProperties: false } },
       },
-      messages: [{ role: 'user', content: [block, { type: 'text', text: prompt }] }],
+      messages: [{ role: 'user', content: [block, { type: 'text', text: AI_PROMPT }] }],
     }),
   });
 
@@ -187,13 +249,7 @@ function extract(req) {
     throw new Error(code === 429 || code === 529 ? 'AI 辨識忙碌中，請稍後再試' : 'AI 辨識失敗（' + code + '）');
   }
   if (body.stop_reason === 'refusal') throw new Error('AI 無法辨識這份檔案，請手動填寫');
-  const text = (body.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-  let values;
-  try { values = JSON.parse(text); } catch (e) { throw new Error('AI 辨識結果格式錯誤，請手動填寫'); }
-  const uncertain = Array.isArray(values.uncertain) ? values.uncertain : [];
-  delete values.uncertain;
-  Object.keys(values).forEach(k => { values[k] = String(values[k] || '').trim(); if (!values[k]) delete values[k]; });
-  return { ok: true, values: values, uncertain: uncertain };
+  return (body.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
 }
 
 /* ---------------- 管理後台 ---------------- */
