@@ -13,6 +13,8 @@ const CONFIG = {
   REVIEW_FEE: 300,             // 審核手續費
   POLL_SECONDS: 15,            // 「審核申請中」頁面自動檢查間隔
   DEMO_ADMIN_PASSWORD: 'admin1234',
+  // 通知書印章：留空 = 使用程式畫的仿真印章；要換成圖檔就填路徑，例如 'assets/stamp.png'
+  STAMP_IMAGE: '',
 };
 
 const CATEGORIES = [
@@ -348,7 +350,39 @@ function renderNotice(app) {
         <div>單位主管：<span>${esc(r.supervisor || '')}</span></div>
         <div>經辦人：<span>${esc(r.handler || '')}</span></div>
       </div>
-      <div class="notice-stamp">${esc(CONFIG.ORG_NAME)}<br>資格審核專用章</div>
+      <div class="notice-stamp-wrap">${CONFIG.STAMP_IMAGE
+        ? `<img class="notice-stamp-img" src="${esc(CONFIG.STAMP_IMAGE)}" alt="印章">`
+        : renderStamp({ approved: '核准', waitlist: '候補' }[r.result] || '審核', r.reviewedAt)}</div>
     </footer>
   </article>`;
+}
+
+/* ---------------- 仿真印章（SVG，純視覺用） ---------------- */
+let stampSeq = 0;
+function renderStamp(word, iso) {
+  const id = 'stk' + (++stampSeq);
+  const d = iso ? new Date(iso) : new Date();
+  const date = `${d.getFullYear() - 1911}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`;
+  const org = CONFIG.ORG_NAME;
+  return `
+  <svg class="notice-stamp-svg" viewBox="0 0 200 200" role="img" aria-label="${esc(org)} ${esc(word)}章">
+    <defs>
+      <filter id="${id}">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${stampSeq * 7}" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="3"/>
+        <feComponentTransfer><feFuncA type="table" tableValues="0 0.75 0.95 0.85"/></feComponentTransfer>
+      </filter>
+      <path id="${id}t" d="M 38,100 A 62,62 0 0 1 162,100"/>
+      <path id="${id}b" d="M 26,100 A 74,74 0 0 0 174,100"/>
+    </defs>
+    <g fill="none" stroke="#d0141f" filter="url(#${id})">
+      <circle cx="100" cy="100" r="93" stroke-width="6"/>
+      <circle cx="100" cy="100" r="85" stroke-width="1.6"/>
+      <g fill="#d0141f" stroke="none" font-family="'Noto Serif TC','DFKai-SB','BiauKai','PMingLiU',serif" font-weight="900">
+        <text font-size="19"><textPath href="#${id}t" startOffset="50%" text-anchor="middle" textLength="176" lengthAdjust="spacing">${esc(org)}</textPath></text>
+        <text x="100" y="122" font-size="46" text-anchor="middle" letter-spacing="2">${esc(word)}</text>
+        <text font-size="15" font-weight="700"><textPath href="#${id}b" startOffset="50%" text-anchor="middle">★ ${date} ★</textPath></text>
+      </g>
+    </g>
+  </svg>`;
 }
