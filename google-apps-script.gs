@@ -28,7 +28,7 @@ HEADERS.forEach((h, i) => { COL[h] = i + 1; });
 
 // 自動審核：送出後超過 minutes 分鐘仍未人工審核，系統自動核准，名次在 rankMin~rankMax 隨機
 const AUTO_REVIEW = {
-  enabled: true,
+  enabled: false,         // true = 開啟自動審核
   minutes: 10,
   rankMin: 21,
   rankMax: 25,
