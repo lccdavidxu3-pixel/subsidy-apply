@@ -384,7 +384,7 @@ function renderStatus(app, box) {
       <div class="card state-card">
         <div class="spinner"></div>
         <h2>審核申請中，請稍後</h2>
-        <p class="muted" style="margin-top:6px">您的資格審核申請已送出，中心審核簽核完成後，此頁面會自動顯示通知書。</p>
+        <p class="muted" style="margin-top:6px">您的資格審核申請已送出，最慢約 ${CONFIG.AUTO_REVIEW_MINUTES} 分鐘內完成審核，完成後此頁面會自動顯示通知書。</p>
         <div class="app-id">申請編號：<b>${esc(app.id)}</b></div>
         <div class="timeline">
           <div class="tl done"><i>✓</i>送出申請</div>

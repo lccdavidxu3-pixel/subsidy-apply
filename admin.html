@@ -53,7 +53,7 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:13px;margin:12px 0 40px">每 30 秒自動更新。</p>
+    <p class="muted" style="font-size:13px;margin:12px 0 40px">每 30 秒自動更新。送出超過 10 分鐘仍未人工審核的申請，系統會自動核准（名次 21～25 隨機），標示「自動」；之後仍可人工修改結果。</p>
   </div>
 </section>
 
@@ -140,7 +140,7 @@ function render() {
 
   $('#rows').innerHTML = list.length ? list.map(a => {
     const r = a.review;
-    const result = r ? (r.result === 'rejected' ? '婉拒' : `${r.result === 'approved' ? '核准第' : '候補第'} ${esc(r.rank)} 名`) : '';
+    const result = r ? (r.result === 'rejected' ? '婉拒' : `${r.result === 'approved' ? '核准第' : '候補第'} ${esc(r.rank)} 名`) + (r.auto ? ' <span class="badge st-pending" title="逾時未人工審核，系統自動核准">自動</span>' : '') : '';
     return `<tr>
       <td class="mono">${esc(a.id)}</td>
       <td>${esc(fmtDateTime(a.createdAt))}</td>

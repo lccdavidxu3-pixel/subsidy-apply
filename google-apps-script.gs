@@ -26,6 +26,17 @@ const HEADERS = [
 const COL = {};
 HEADERS.forEach((h, i) => { COL[h] = i + 1; });
 
+// 自動審核：送出後超過 minutes 分鐘仍未人工審核，系統自動核准，名次在 rankMin~rankMax 隨機
+const AUTO_REVIEW = {
+  enabled: true,
+  minutes: 10,
+  rankMin: 21,
+  rankMax: 25,
+  courseType: '',          // 自動核准時帶入的專案課程類別（留空 = 通知書不顯示）
+  supervisor: '',
+  handler: '系統自動審核',
+};
+
 const QUESTION_EXPECT = { q1: '是', q2: '是', q3: '是', q5: '是', q6: '是', q7: '是', q8: '同意', q9: '同意', q10: '同意' };
 const DATA_FIELDS = ['category', 'name', 'gender', 'marital', 'birthDate', 'phoneHome', 'mobile', 'idNo', 'address',
   'military', 'email', 'school', 'dept', 'motivation', 'confirm', 'fillDate', 'fileName',
@@ -115,7 +126,7 @@ function requireAdmin(req) {
 }
 
 function adminList() {
-  const rows = readRows(getSheet());
+  const rows = loadRows();
   return {
     ok: true,
     apps: rows.reverse().map(r => ({
@@ -173,27 +184,83 @@ function adminReview(req) {
     const rows = readRows(sheet);
     const rec = rows.find(x => x.id === req.id);
     if (!rec) throw new Error('查無此申請');
-    const now = new Date();
-    review.reviewedAt = now.toISOString();
-    review.noticeNo = (rec.review && rec.review.noticeNo) || nextNoticeNo(rows, now);
-
-    const set = (h, v) => sheet.getRange(rec.row, COL[h]).setValue(v);
-    set('狀態', STATUS_LABEL[review.result]);
-    set('審核時間', now);
-    set('名次', review.rank);
-    set('專案課程類別', cell(review.courseType));
-    set('分期期數', review.installments === '其它' ? cell(review.installmentsOther) : review.installments);
-    set('學習意願', review.score);
-    set('單位主管', cell(review.supervisor));
-    set('經辦人', cell(review.handler));
-    set('通知書字號', review.noticeNo);
-    set('審核資料(JSON)', JSON.stringify(review));
-    rec.review = review;
-    rec.status = review.result;
+    writeReview(sheet, rec, review, rows, new Date());
     return { ok: true, app: publicView(rec) };
   } finally {
     lock.releaseLock();
   }
+}
+
+function writeReview(sheet, rec, review, rows, now) {
+  review.reviewedAt = now.toISOString();
+  review.noticeNo = (rec.review && rec.review.noticeNo) || nextNoticeNo(rows, now);
+  const set = (h, v) => sheet.getRange(rec.row, COL[h]).setValue(v);
+  set('狀態', STATUS_LABEL[review.result]);
+  set('審核時間', now);
+  set('名次', review.rank);
+  set('專案課程類別', cell(review.courseType));
+  set('分期期數', review.installments === '其它' ? cell(review.installmentsOther) : review.installments);
+  set('學習意願', review.score);
+  set('單位主管', cell(review.supervisor));
+  set('經辦人', cell(review.handler));
+  set('通知書字號', review.noticeNo);
+  set('審核資料(JSON)', JSON.stringify(review));
+  rec.review = review;
+  rec.status = review.result;
+}
+
+/* ---------------- 自動審核 ----------------
+ * 每次有人查詢進度或打開後台時檢查一次，逾時未審的申請自動核准。
+ * 若希望沒人查詢時也準時處理：在 Apps Script 執行一次 setupAutoReviewTrigger()（每分鐘檢查）。
+ */
+function autoReviewDue(sheet, rows) {
+  if (!AUTO_REVIEW.enabled) return false;
+  const limit = AUTO_REVIEW.minutes * 60000;
+  const isDue = r => r.status === 'pending' && Date.now() - new Date(r.createdAt).getTime() >= limit;
+  if (!rows.some(isDue)) return false;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const fresh = readRows(sheet); // 拿鎖後重讀，避免和人工審核撞在一起
+    let changed = false;
+    fresh.filter(isDue).forEach(rec => {
+      const span = AUTO_REVIEW.rankMax - AUTO_REVIEW.rankMin + 1;
+      writeReview(sheet, rec, {
+        result: 'approved',
+        rank: String(AUTO_REVIEW.rankMin + Math.floor(Math.random() * span)),
+        courseType: AUTO_REVIEW.courseType,
+        installments: '', installmentsOther: '',
+        supervisor: AUTO_REVIEW.supervisor,
+        handler: AUTO_REVIEW.handler,
+        score: '',
+        note: '逾 ' + AUTO_REVIEW.minutes + ' 分鐘未人工審核，系統自動核准',
+        auto: true,
+      }, fresh, new Date());
+      changed = true;
+    });
+    return changed;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function loadRows() {
+  const sheet = getSheet();
+  const rows = readRows(sheet);
+  return autoReviewDue(sheet, rows) ? readRows(sheet) : rows;
+}
+
+// 時間觸發器呼叫
+function autoReviewJob() {
+  const sheet = getSheet();
+  autoReviewDue(sheet, readRows(sheet));
+}
+
+// 手動執行一次即可建立「每分鐘自動審核」觸發器（重複執行不會重複建立）
+function setupAutoReviewTrigger() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'autoReviewJob').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('autoReviewJob').timeBased().everyMinutes(1).create();
 }
 
 /* ---------------- 資料存取 ---------------- */
@@ -237,7 +304,7 @@ function readRows(sheet) {
 }
 
 function findById(id) {
-  return readRows(getSheet()).find(r => r.id === id) || null;
+  return loadRows().find(r => r.id === id) || null;
 }
 
 function publicView(rec) {

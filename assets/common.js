@@ -12,6 +12,7 @@ const CONFIG = {
   REG_FEE: 1000,               // 報名費
   REVIEW_FEE: 300,             // 審核手續費
   POLL_SECONDS: 15,            // 「審核申請中」頁面自動檢查間隔
+  AUTO_REVIEW_MINUTES: 10,     // 與 google-apps-script.gs 的 AUTO_REVIEW.minutes 相同，只用來顯示提示文字
   DEMO_ADMIN_PASSWORD: 'admin1234',
   // 通知書印章：留空 = 使用程式畫的仿真印章；要換成圖檔就填路徑，例如 'assets/stamp.png'
   STAMP_IMAGE: '',
@@ -315,7 +316,7 @@ function renderNotice(app) {
   if (r.result === 'approved') {
     subject = `台端申請「${CONFIG.PROGRAM_NAME}」專案（身分類別：${app.category}），經本中心資格審核，<b>核准第 ${esc(r.rank)} 名</b>，特此通知。`;
     items = [
-      `專案課程類別：<b>${esc(r.courseType)}</b>`,
+      r.courseType ? `專案課程類別：<b>${esc(r.courseType)}</b>` : '',
       installmentText(r) ? `分期期數：<b>${esc(installmentText(r))}</b>` : '',
       `請於收到本通知書起 ${CONFIG.REPORT_DAYS} 日內，攜帶身分證件正本至本中心辦理報名手續；報名費 ${CONFIG.REG_FEE.toLocaleString()} 元，已繳之審核手續費 ${CONFIG.REVIEW_FEE} 元可扣抵。`,
       '受訓期間缺課達訓練總時數 1/3（含）以上、退訓或訓練成績不合格者，不發給原廠認證證書。',
