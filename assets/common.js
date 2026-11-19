@@ -191,6 +191,7 @@ const DemoBackend = {
         installmentsOther: r.installmentsOther, supervisor: r.supervisor, handler: r.handler,
         noticeNo: r.noticeNo, reviewedAt: r.reviewedAt, score: r.score,
         planAPrice: r.planAPrice, planAPeriods: r.planAPeriods, planBPrice: r.planBPrice, planBPeriods: r.planBPeriods,
+        planAItems: r.planAItems, planBItems: r.planBItems,
       } : null,
     };
   },
@@ -359,7 +360,8 @@ function rocYmd(iso) {
 function planAmount(p, r) {
   const price = Number((r || {})['plan' + p.code + 'Price']) || p.price;
   const periods = Number((r || {})['plan' + p.code + 'Periods']) || p.periods;
-  return Object.assign({}, p, { price, periods });
+  const custom = String((r || {})['plan' + p.code + 'Items'] || '').split('\n').map(s => s.trim()).filter(Boolean);
+  return Object.assign({}, p, { price, periods, items: custom.length ? custom : p.items });
 }
 
 function renderNotice(app) {

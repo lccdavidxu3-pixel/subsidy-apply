@@ -376,6 +376,7 @@ table.list .mono { font-family: Consolas, monospace; }
 .plan-row label:nth-of-type(2) { flex: 0 1 110px; }
 .plan-row input[type=number] { flex: 1; min-width: 0; width: auto; padding: 6px 8px; }
 .plan-row .plan-total { flex: 0 0 100%; font-size: 13px; }
+.plan-row textarea { flex: 0 0 100%; min-height: 76px; font-size: 13.5px; }
 #printArea { display: none; }
 @media print {
   html, body { background: #fff !important; overflow: visible !important; height: auto !important; }

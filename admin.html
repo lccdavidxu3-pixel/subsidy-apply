@@ -220,12 +220,13 @@ function renderDetail(app) {
           <label class="field"><span>單位主管</span><input type="text" name="supervisor" value="${esc(r.supervisor || '')}"></label>
           <label class="field"><span>經辦人</span><input type="text" name="handler" value="${esc(r.handler || localStorage.getItem('hs_handler') || '')}"></label>
         </div>
-        <div class="field"><span>核定補助方案金額（顯示在核准通知書）</span>
+        <div class="field"><span>核定補助方案（金額與內容，顯示在核准通知書）</span>
           ${CONFIG.NOTICE.plans.map(p => { const v = planAmount(p, r); return `
           <div class="plan-row"><b>方案 ${esc(p.code)}</b>
             <label>每期 NT$ <input type="number" min="0" step="1" name="plan${p.code}Price" value="${esc(v.price)}"></label>
             <label>× <input type="number" min="1" step="1" name="plan${p.code}Periods" value="${esc(v.periods)}"> 期</label>
             <span class="muted plan-total" data-code="${p.code}"></span>
+            <textarea name="plan${p.code}Items" rows="3" placeholder="方案內容，一行一項">${esc(v.items.join('\n'))}</textarea>
           </div>`; }).join('')}
         </div>
         <label class="field"><span>學習意願評分（1–10 分）</span><input type="number" name="score" min="1" max="10" value="${esc(r.score || '')}"></label>
@@ -268,6 +269,7 @@ function renderDetail(app) {
     CONFIG.NOTICE.plans.forEach(p => {
       review['plan' + p.code + 'Price'] = f['plan' + p.code + 'Price'].value.trim();
       review['plan' + p.code + 'Periods'] = f['plan' + p.code + 'Periods'].value.trim();
+      review['plan' + p.code + 'Items'] = f['plan' + p.code + 'Items'].value.split('\n').map(s => s.trim()).filter(Boolean).join('\n');
     });
     const err = $('#reviewErr');
     const fail = m => { err.textContent = m; err.hidden = false; };
