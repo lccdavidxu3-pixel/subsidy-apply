@@ -16,6 +16,22 @@ const CONFIG = {
   DEMO_ADMIN_PASSWORD: 'admin1234',
   // 通知書印章：留空 = 使用程式畫的仿真印章；要換成圖檔就填路徑，例如 'assets/stamp.png'
   STAMP_IMAGE: '',
+  // 核准通知單版面文字（可自行修改）
+  NOTICE: {
+    brand: '聯成', brandAccent: '電腦',
+    subOrg: '聯成電腦認證中心｜雲嘉南區認證中心',
+    tagline: 'PROFESSIONAL TRAINING APPROVAL',
+    planLine: '2026 原廠技能培訓提昇計畫・產業人才培訓補助',
+    projectFull: '2026 原廠技能培訓提昇計畫－產業人才培訓補助乙案',
+    badge: '2026 年度專案補助｜數位產業斜槓人才班・本梯次限額 30 名',
+    quota: 30,                    // 本梯次名額，印章顯示「第 N / 30 名」
+    unit: '雲嘉南區認證中心',       // 專案審核單位
+    committee: '聯成電腦認證中心・專案審核委員會',
+    plans: [
+      { code: 'A', price: 2880, periods: 30, items: ['先修 AI 工具', 'AutoCAD', 'SketchUp'] },
+      { code: 'B', price: 3600, periods: 30, items: ['先修 AI 工具・AutoCAD・SketchUp', '室內裝修乙級證照', '5 年錄播課程卡'], tag: '完整進修', featured: true },
+    ],
+  },
 };
 
 const CATEGORIES = [
@@ -169,10 +185,11 @@ const DemoBackend = {
     const r = a.review;
     return {
       id: a.id, createdAt: a.createdAt, status: a.status, category: a.data.category, name: a.data.name,
+      idMasked: maskId(a.data.idNo), mobile: a.data.mobile, checks: noticeChecks(a.data),
       review: r ? {
         result: r.result, rank: r.rank, courseType: r.courseType, installments: r.installments,
         installmentsOther: r.installmentsOther, supervisor: r.supervisor, handler: r.handler,
-        noticeNo: r.noticeNo, reviewedAt: r.reviewedAt,
+        noticeNo: r.noticeNo, reviewedAt: r.reviewedAt, score: r.score,
       } : null,
     };
   },
@@ -308,58 +325,145 @@ function renderApplicationSheet(app) {
 
 /* ---------------- 通知書 ---------------- */
 
+// 通知單上的「資格審核明細」：依申請人作答換算（與 google-apps-script.gs 的 noticeChecks 相同）
+function noticeChecks(d) {
+  d = d || {};
+  const all = (...ks) => ks.every(k => d[k] === QUESTIONS.find(q => q.id === k).expect);
+  return {
+    c1: d.q1 === '是', c2: d.q2 === '是', c3: d.q3 === '是',
+    c4: d.q4 === '否', c5: d.q6 === '是', c6: all('q7', 'q8', 'q9', 'q10'),
+  };
+}
+
+function fmtMobile(m) {
+  const s = String(m || '').replace(/\D/g, '');
+  return s.length === 10 ? `${s.slice(0, 4)}-${s.slice(4, 7)}-${s.slice(7)}` : (m || '');
+}
+
+function rocYmd(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  return isNaN(d) ? '' : `${d.getFullYear() - 1911} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+}
+
 function renderNotice(app) {
+  const N = CONFIG.NOTICE;
   const r = app.review || {};
-  const titles = { approved: '核准通知書', waitlist: '候補通知書', rejected: '審核結果通知書' };
-  let subject = '';
-  let items = [];
-  if (r.result === 'approved') {
-    subject = `台端申請「${CONFIG.PROGRAM_NAME}」專案（身分類別：${app.category}），經本中心資格審核，<b>核准第 ${esc(r.rank)} 名</b>，特此通知。`;
-    items = [
-      r.courseType ? `專案課程類別：<b>${esc(r.courseType)}</b>` : '',
-      installmentText(r) ? `分期期數：<b>${esc(installmentText(r))}</b>` : '',
-      `請於收到本通知書起 ${CONFIG.REPORT_DAYS} 日內，攜帶身分證件正本至本中心辦理報名手續；報名費 ${CONFIG.REG_FEE.toLocaleString()} 元，已繳之審核手續費 ${CONFIG.REVIEW_FEE} 元可扣抵。`,
-      '受訓期間缺課達訓練總時數 1/3（含）以上、退訓或訓練成績不合格者，不發給原廠認證證書。',
-      '逾期未辦理報名者視同放棄，名額將由候補人員依序遞補。',
-    ];
-  } else if (r.result === 'waitlist') {
-    subject = `台端申請「${CONFIG.PROGRAM_NAME}」專案（身分類別：${app.category}），經本中心資格審核，<b>列為候補第 ${esc(r.rank)} 名</b>。`;
-    items = [
-      r.courseType ? `申請專案課程類別：${esc(r.courseType)}` : '',
-      '如有名額釋出，本中心將依候補順序以電話或 Email 通知，屆時再請辦理報名手續。',
-      '候補期間如聯絡方式有異動，請主動告知本中心。',
-    ];
-  } else {
-    subject = `台端申請「${CONFIG.PROGRAM_NAME}」專案（身分類別：${app.category}），經本中心資格審核，<b>資格不符本專案補助條件</b>，歉難同意，敬請見諒。`;
-    items = ['感謝您對本中心課程的支持，如有其他課程需求，歡迎洽詢本中心專員。'];
-  }
-  items = items.filter(Boolean);
+  const res = r.result;
+  const ok = res === 'approved';
+  const word = { approved: '核准', waitlist: '候補', rejected: '未通過' }[res] || '審核中';
+  const rankTxt = res === 'rejected' ? '' : `${esc(r.rank)} / ${N.quota}`;
+  const checks = app.checks;
+  const CHECK_LABELS = [
+    ['c1', '具本國國籍且具就業能力與意願'], ['c2', '年滿 18 歲以上之中華民國國民'],
+    ['c3', '高中職以上畢業'], ['c4', '一年內未參加政府公費補助訓練課程'],
+    ['c5', '二年內未曾申請相關原廠補助課程'], ['c6', '同意受訓規範、證書核發及退訓規定'],
+  ];
+  const chk = (k) => !checks || !(k in checks) ? '<span class="nt-ok">✓ 符合</span>'
+    : checks[k] ? '<span class="nt-ok">✓ 符合</span>' : '<span class="nt-no">待確認</span>';
+  const step = (en, zh, state, txt) => `
+      <div class="nt-step nt-${state}">
+        <div class="nt-dot">${state === 'final' ? '★' : state === 'fail' ? '✕' : '✓'}</div>
+        <div class="nt-en">${en}</div>
+        <div class="nt-zh">${zh}<b>${txt}</b></div>
+      </div>`;
+  const s3 = res === 'rejected' ? step('APPROVAL', '最終核定', 'fail', '未通過') : step('APPROVAL', '最終核定', 'final', word);
+  const money = (n) => 'NT$ ' + Number(n).toLocaleString();
+  const plans = ok ? `
+    <h3 class="nt-h">核定補助方案</h3>
+    <div class="nt-plans">${N.plans.map(p => `
+      <div class="nt-plan${p.featured ? ' nt-feat' : ''}">
+        ${p.tag ? `<span class="nt-tag">${esc(p.tag)}</span>` : ''}
+        <div class="nt-pcode">PLAN ${esc(p.code)}</div>
+        <div class="nt-price">${money(p.price)}<small>／期 × ${p.periods} 期</small></div>
+        <div class="nt-total">合計 ${money(p.price * p.periods)}</div>
+        <ul>${p.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+        <div class="nt-pick"><span class="nt-cb"></span>選擇 ${esc(p.code)} 方案</div>
+      </div>`).join('')}
+    </div>` : '';
+  const intro = ok
+    ? `經查核申請資格、親簽文件及就業顧問初審評分合格，特此通知審核結果與核定補助方案。`
+    : res === 'waitlist'
+      ? `經查核申請資格及就業顧問初審評分，列為候補第 ${esc(r.rank)} 名；如有名額釋出，本中心將依候補順序以電話或 Email 通知。`
+      : `經查核申請資格，資格不符本專案補助條件，歉難同意，敬請見諒。如有其他課程需求，歡迎洽詢本中心專員。`;
+  const notes = ok
+    ? `1. 名次及方案以本中心最終審核為準，本中心於開課前保有最後審核之權利。　2. 審核通過後請於 ${CONFIG.REPORT_DAYS} 日內繳交報名費 NT$${CONFIG.REG_FEE.toLocaleString()}（已繳審核手續費 NT$${CONFIG.REVIEW_FEE} 元可抵扣）。　3. 缺課達總時數 1/3（含）以上、退訓或各科考試成績低於 60 分者，不發給原廠認證證書。　4. 請勿惡意取消，如有此情形將列入原廠及企業之黑名單，爾後將影響面試機會。`
+    : `1. 本通知以本中心審核結果為準。　2. 聯絡方式如有異動，請主動告知本中心。`;
   return `
-  <article class="notice" id="noticeDoc">
-    <header class="notice-head">
-      <div class="notice-org">${esc(CONFIG.ORG_NAME)}</div>
-      <h1>${esc(CONFIG.PROGRAM_NAME)}資格審核　${titles[r.result] || '通知書'}</h1>
-    </header>
-    <table class="notice-meta">
-      <tr><th>發文日期</th><td>${esc(rocDate(r.reviewedAt))}</td><th>發文字號</th><td>${esc(r.noticeNo || '')}</td></tr>
-      <tr><th>受文者</th><td>${esc(app.name)} 君</td><th>申請編號</th><td>${esc(app.id)}</td></tr>
-    </table>
-    <p class="notice-subject"><span class="lbl">主旨：</span>${subject}</p>
-    <div class="notice-body"><span class="lbl">說明：</span><ol>${items.map(i => `<li>${i}</li>`).join('')}</ol></div>
-    <footer class="notice-foot">
-      <div class="notice-signs">
-        <div>單位主管：<span>${esc(r.supervisor || '')}</span></div>
-        <div>經辦人：<span>${esc(r.handler || '')}</span></div>
+  <article class="notice nt" id="noticeDoc">
+    <header class="nt-top">
+      <div>
+        <div class="nt-brand">${esc(N.brand)}<span>${esc(N.brandAccent)}</span></div>
+        <div class="nt-sub">${esc(N.subOrg)}</div>
       </div>
-      <div class="notice-stamp-wrap">${CONFIG.STAMP_IMAGE
-        ? `<img class="notice-stamp-img" src="${esc(CONFIG.STAMP_IMAGE)}" alt="印章">`
-        : renderStamp({ approved: '核准', waitlist: '候補' }[r.result] || '審核', r.reviewedAt)}</div>
-    </footer>
+      <div class="nt-topr">
+        <div class="nt-tagline">${esc(N.tagline)}</div>
+        <div class="nt-planline">${esc(N.planLine)}</div>
+        <div class="nt-case">案號　<span>${esc(r.noticeNo || app.id)}</span></div>
+      </div>
+    </header>
+    <div class="nt-bar"></div>
+    <div class="nt-body">
+      <div class="nt-hero">
+        <div class="nt-herol">
+          <div class="nt-badge">● ${esc(N.badge)}</div>
+          <h1>專案培訓補助<br>資格審核結果通知單</h1>
+          <p class="nt-intro">茲核定申請人 <u>${esc(app.name)}</u> 參加本中心「${esc(N.projectFull)}」，${intro}</p>
+        </div>
+        ${res === 'rejected' ? '' : (CONFIG.STAMP_IMAGE ? `<img class="nt-stamp" src="${esc(CONFIG.STAMP_IMAGE)}" alt="印章">` : renderRankStamp(res, r.rank, N.quota))}
+      </div>
+      <div class="nt-info">
+        <div><label>申請人</label><b class="nt-name">${esc(app.name)}</b></div>
+        <div><label>身分證號碼</label><b>${esc(app.idMasked || '—')}</b></div>
+        <div><label>聯絡手機</label><b>${esc(fmtMobile(app.mobile) || '—')}</b></div>
+        <div><label>培訓類組</label><b>${esc(r.courseType || app.category || '—')}</b></div>
+      </div>
+      <div class="nt-steps">
+        ${step('QUALIFICATION', '資格審查', res === 'rejected' ? 'fail' : 'done', res === 'rejected' ? '不符' : '通過')}
+        ${step('ASSESSMENT', '顧問初審', res === 'rejected' ? 'off' : 'done', res === 'rejected' ? '—' : '通過')}
+        ${s3}
+      </div>
+      <h3 class="nt-h">資格審核明細</h3>
+      <div class="nt-checks">
+        ${CHECK_LABELS.map(([k, t]) => `<div><span>${t}</span>${chk(k)}</div>`).join('')}
+        <div class="nt-score"><span>學習意願評分（1～10 分）</span><b>${r.score ? esc(r.score) + ' 分' : '—'}</b>${String(r.score) === '10' ? '<small>（滿分）</small>' : ''}</div>
+      </div>
+      ${plans}
+      <div class="nt-sign">
+        <div><label>參訓人親簽</label><div class="nt-line"></div></div>
+        <div><label>專案審核單位</label><b>${esc(N.unit)}</b>${res === 'rejected' ? '' : `<div class="nt-${ok ? 'pass' : 'wait'}">✓ 審核${word}（${rankTxt}）</div>`}</div>
+        <div><label>審核日期</label><b>${esc(rocYmd(r.reviewedAt))}</b></div>
+      </div>
+      <div class="nt-notes"><b>注意事項</b>　${notes}</div>
+    </div>
+    <footer class="nt-foot"><span>${esc(N.committee)}</span><span>本通知單經審核單位核定後生效</span></footer>
   </article>`;
 }
 
-/* ---------------- 仿真印章（SVG，純視覺用） ---------------- */
+/* ---------------- 名次印章（SVG，純視覺用） ---------------- */
 let stampSeq = 0;
+function renderRankStamp(result, rank, quota) {
+  const id = 'stk' + (++stampSeq);
+  const word = result === 'approved' ? '核准' : '候補';
+  const en = result === 'approved' ? 'APPROVED' : 'WAITLIST';
+  return `
+  <svg class="nt-stamp" viewBox="0 0 200 200" role="img" aria-label="${word}章">
+    <defs>
+      <filter id="${id}"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${stampSeq * 7}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2"/></filter>
+      <path id="${id}t" d="M 45,100 A 55,55 0 0 1 155,100"/>
+    </defs>
+    <g fill="none" stroke="#c8102e" filter="url(#${id})">
+      <circle cx="100" cy="100" r="94" stroke-width="3.5"/>
+      <circle cx="100" cy="100" r="84" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <g fill="#c8102e" stroke="none" font-family="'Noto Sans TC','Microsoft JhengHei',sans-serif" font-weight="900">
+        <text font-size="15" letter-spacing="3"><textPath href="#${id}t" startOffset="50%" text-anchor="middle">${en}</textPath></text>
+        <text x="100" y="118" font-size="46" text-anchor="middle" letter-spacing="4">${word}</text>
+        <text x="100" y="152" text-anchor="middle" font-size="15">第 <tspan font-size="28">${esc(rank)}</tspan> / ${quota} 名</text>
+      </g>
+    </g>
+  </svg>`;
+}
+
+/* ---------------- 仿真印章（SVG，純視覺用） ---------------- */
 function renderStamp(word, iso) {
   const id = 'stk' + (++stampSeq);
   const d = iso ? new Date(iso) : new Date();

@@ -312,11 +312,28 @@ function publicView(rec) {
   return {
     id: rec.id, createdAt: rec.createdAt, status: rec.status,
     category: rec.data.category, name: rec.data.name,
+    idMasked: maskIdNo(rec.data.idNo), mobile: rec.data.mobile, checks: noticeChecks(rec.data),
     review: rec.review ? {
       result: r.result, rank: r.rank, courseType: r.courseType, installments: r.installments,
       installmentsOther: r.installmentsOther, supervisor: r.supervisor, handler: r.handler,
-      noticeNo: r.noticeNo, reviewedAt: r.reviewedAt,
+      noticeNo: r.noticeNo, reviewedAt: r.reviewedAt, score: r.score,
     } : null,
+  };
+}
+
+// 通知單用：身分證號遮蔽中間四碼
+function maskIdNo(id) {
+  id = String(id || '');
+  return id.length === 10 ? id.slice(0, 3) + '****' + id.slice(7) : id;
+}
+
+// 通知單「資格審核明細」：依申請人作答換算
+function noticeChecks(d) {
+  d = d || {};
+  return {
+    c1: d.q1 === '是', c2: d.q2 === '是', c3: d.q3 === '是',
+    c4: d.q4 === '否', c5: d.q6 === '是',
+    c6: d.q7 === '是' && d.q8 === '同意' && d.q9 === '同意' && d.q10 === '同意',
   };
 }
 
