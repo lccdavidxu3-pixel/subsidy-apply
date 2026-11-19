@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高階原廠補助｜線上資格審核申請</title>
+<meta name="description" content="高階原廠補助專案線上申請：待業、職業軍人、二度就業、技能升級，上傳初審表自動填寫，線上查詢審核結果。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@500;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <a href="#/" class="logo">高階<span>原廠補助</span></a>
+    <nav class="nav">
+      <a href="#/" data-nav="home">申請補助</a>
+      <a href="#/status" data-nav="status">查詢審核進度</a>
+    </nav>
+  </div>
+</header>
+<div id="demoBanner" class="demo-banner" hidden>示範模式：尚未連接 Google 試算表，資料只存在這台電腦的瀏覽器中（管理後台：admin.html）。</div>
+
+<main>
+  <!-- ========== 首頁：選擇身分 ========== -->
+  <section id="view-home" class="view">
+    <div class="hero">
+      <div class="container">
+        <h1>高階原廠補助<br><span>國際原廠認證課程</span> 資格審核申請</h1>
+        <p>此專案是針對就業、外包及考照能力的提升。請先選擇您的身分類別，上傳已填寫的初審表即可自動帶入資料；沒有初審表也可以直接線上填寫。</p>
+      </div>
+    </div>
+    <div class="container cat-wrap">
+      <div class="cat-grid" id="catGrid"></div>
+      <div id="mineBanner" class="mine-banner" hidden></div>
+      <div class="steps">
+        <div class="step"><b>STEP 1</b>選擇身分類別</div>
+        <div class="step"><b>STEP 2</b>上傳初審表自動填入，或手動填寫</div>
+        <div class="step"><b>STEP 3</b>送出後由中心審核簽核</div>
+        <div class="step"><b>STEP 4</b>線上取得核准通知書</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 申請表 ========== -->
+  <section id="view-apply" class="view" hidden>
+    <div class="container">
+      <div class="page-head">
+        <div>
+          <h1>資格審核申請表</h1>
+          <span class="cat-pill" id="catPill"></span>
+          <a href="#/" class="btn-link" style="font-size:14px;margin-left:8px">更換身分</a>
+        </div>
+        <div class="muted" style="font-size:14px">填表日期：<span id="fillDateText"></span></div>
+      </div>
+
+      <form id="applyForm" novalidate>
+        <div class="card">
+          <div class="card-h">📄 上傳初審表，自動填入</div>
+          <label class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept=".docx,.pdf,image/*" hidden>
+            <div class="dz-icon">⬆️</div>
+            <div><b>點此選擇檔案</b>，或把檔案拖曳到這裡</div>
+            <div class="muted" style="font-size:13px">支援 Word(.docx)、PDF、照片或掃描圖檔（JPG／PNG）</div>
+          </label>
+          <div id="uploadStatus" class="upload-status" hidden></div>
+          <p class="or-line">沒有初審表？直接在下方手動填寫即可。</p>
+        </div>
+
+        <div id="errSummary" class="err-summary" hidden></div>
+
+        <div class="card">
+          <div class="card-h"><span class="num">一</span>資格審核</div>
+          <ol class="q-list" id="qList"></ol>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><span class="num">二</span>個人基本資料</div>
+          <div class="grid2">
+            <label class="field" data-f="name"><span>姓名<i class="req">*</i></span><input type="text" name="name" maxlength="30" autocomplete="name"></label>
+            <div class="field" data-f="gender"><span>性別<i class="req">*</i></span>
+              <div class="choices"><label class="choice"><input type="radio" name="gender" value="男"><span>男</span></label><label class="choice"><input type="radio" name="gender" value="女"><span>女</span></label></div>
+            </div>
+            <div class="field" data-f="marital"><span>婚姻狀況</span>
+              <div class="choices"><label class="choice"><input type="radio" name="marital" value="已婚"><span>已婚</span></label><label class="choice"><input type="radio" name="marital" value="未婚"><span>未婚</span></label></div>
+            </div>
+            <label class="field" data-f="birthDate"><span>出生日期<i class="req">*</i></span><input type="date" name="birthDate" max=""></label>
+            <label class="field" data-f="idNo"><span>身分證號碼<i class="req">*</i></span><input type="text" name="idNo" maxlength="10" placeholder="A123456789" style="text-transform:uppercase"></label>
+            <div class="field" data-f="military"><span>兵役狀況<i class="req" id="milReq" hidden>*</i></span>
+              <div class="choices"><label class="choice"><input type="radio" name="military" value="未役"><span>未役</span></label><label class="choice"><input type="radio" name="military" value="役畢"><span>役畢</span></label><label class="choice"><input type="radio" name="military" value="免役"><span>免役</span></label></div>
+            </div>
+            <label class="field" data-f="mobile"><span>行動電話<i class="req">*</i></span><input type="tel" name="mobile" maxlength="12" placeholder="0912345678" autocomplete="tel"></label>
+            <label class="field" data-f="phoneHome"><span>市話 (H)</span><input type="tel" name="phoneHome" maxlength="20" placeholder="02-23456789"></label>
+            <label class="field full" data-f="address"><span>聯絡地址<i class="req">*</i></span><input type="text" name="address" maxlength="120" autocomplete="street-address"></label>
+            <label class="field full" data-f="email"><span>Mail<i class="req">*</i></span><input type="email" name="email" maxlength="100" autocomplete="email"></label>
+            <label class="field" data-f="school"><span>最高學歷（學校）<i class="req">*</i></span><input type="text" name="school" maxlength="50"></label>
+            <label class="field" data-f="dept"><span>科系<i class="req">*</i></span><input type="text" name="dept" maxlength="50"></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h" id="extraTitle"></div>
+          <div class="grid2" id="extraFields"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">✍️ 申請動機</div>
+          <label class="field" data-f="motivation"><span style="color:var(--red)">※此專案是針對就業、外包及考照能力的提升。請問您為何會想申請專案？<i class="req">*</i></span>
+            <textarea name="motivation" maxlength="2000" placeholder="請簡述您的背景、想學習的內容與未來規劃"></textarea>
+          </label>
+        </div>
+
+        <div class="card">
+          <div class="card-h">✅ 確認與簽名</div>
+          <div class="notes">
+            <p>＊應繳證件：（一）身份證件　（二）審核費手續費 ${REVIEW_FEE} 元（若審核通過需繳交報名費 ${REG_FEE} 元，可扣抵手續費 ${REVIEW_FEE} 元）</p>
+            <p class="red">＊請培訓申請人勿惡意取消，如有此狀況將列入原廠及企業之黑名單，爾後將影響面試機會。</p>
+          </div>
+          <div class="field" data-f="confirm" style="margin-top:16px">
+            <span>您是否已充份了解整個訓練內容、學員權益…等，且已確定審核資格？<i class="req">*</i></span>
+            <div class="choices"><label class="choice"><input type="radio" name="confirm" value="是"><span>是</span></label><label class="choice"><input type="radio" name="confirm" value="不是"><span>不是</span></label></div>
+          </div>
+          <div class="field" data-f="signature" style="margin-top:18px">
+            <span>申請人親簽<i class="req">*</i></span>
+            <div class="sig-wrap"><canvas id="sigPad"></canvas><div class="sig-line"></div><div class="sig-hint" id="sigHint">請用滑鼠或手指在此簽名</div></div>
+            <div class="sig-tools"><span>簽名將作為審核表之「申請人親簽」</span><button type="button" class="btn btn-ghost btn-sm" id="sigClear">清除重簽</button></div>
+          </div>
+          <label class="check-line" data-f="agree"><input type="checkbox" name="agree"><span>本人已詳閱上述說明，所填資料均屬實；經查證如有虛偽不實者，視同放棄並自行負責。</span></label>
+        </div>
+
+        <div class="submit-bar">
+          <button type="submit" class="btn btn-lg" id="submitBtn">送出資格審核申請</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== 審核中 / 結果 ========== -->
+  <section id="view-pending" class="view" hidden>
+    <div class="container" style="padding:32px 16px 56px" id="pendingBox"></div>
+  </section>
+
+  <!-- ========== 查詢 ========== -->
+  <section id="view-status" class="view" hidden>
+    <div class="container">
+      <div class="card lookup">
+        <div class="card-h">🔎 查詢審核進度</div>
+        <form id="lookupForm">
+          <label class="field"><span>申請編號</span><input type="text" name="appId" placeholder="例：HS251119-1234" style="text-transform:uppercase" required></label>
+          <label class="field"><span>身分證號碼</span><input type="text" name="idNo" maxlength="10" style="text-transform:uppercase" required></label>
+          <p id="lookupErr" class="field-err" hidden style="margin-top:10px"></p>
+          <button class="btn" style="width:100%;margin-top:16px">查詢</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="assets/common.js"></script>
+<script src="assets/parser.js"></script>
+<script>
+'use strict';
+const MINE_KEY = 'hs_my_apps';
+let currentCat = null;
+let uploaded = null;   // { name, dataUrl }
+let pollTimer = null;
+let sigDirty = false;
+let currentCheck = null;   // 審核中頁面：切回分頁時立即重新檢查
+
+/* ---------- 我的申請（只存編號與查詢碼，不存個資） ---------- */
+const mine = {
+  all() { try { return JSON.parse(localStorage.getItem(MINE_KEY)) || {}; } catch (e) { return {}; } },
+  add(id, token) { const m = this.all(); m[id] = token; localStorage.setItem(MINE_KEY, JSON.stringify(m)); },
+  token(id) { return this.all()[id]; },
+};
+
+/* ---------- 路由 ---------- */
+function showView(name) {
+  $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
+  $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === name || (name === 'apply' && a.dataset.nav === 'home')));
+  clearInterval(pollTimer);
+  window.scrollTo(0, 0);
+}
+
+function route() {
+  const [, view, arg] = decodeURIComponent(location.hash.slice(1) || '/').split('/');
+  if (view === 'apply' && CATEGORIES.some(c => c.key === arg)) return openApply(arg);
+  if (view === 'pending' && arg) return openPending(arg);
+  if (view === 'status') { showView('status'); if (arg) $('#lookupForm').elements.appId.value = arg; return; }
+  showView('home');
+  renderMine();
+}
+
+/* ---------- 首頁 ---------- */
+$('#catGrid').innerHTML = CATEGORIES.map(c => `
+  <a class="cat-card" href="#/apply/${encodeURIComponent(c.key)}">
+    <div class="cat-icon">${c.icon}</div>
+    <div class="cat-name">${esc(c.key)}</div>
+    <div class="cat-desc">${esc(c.desc)}</div>
+    <div class="cat-go">開始申請 →</div>
+  </a>`).join('');
+
+function renderMine() {
+  const ids = Object.keys(mine.all());
+  const box = $('#mineBanner');
+  if (!ids.length) { box.hidden = true; return; }
+  const last = ids[ids.length - 1];
+  box.hidden = false;
+  box.innerHTML = `<span>您在這台裝置上有申請紀錄：<b>${esc(last)}</b></span><a class="btn btn-sm" href="#/pending/${encodeURIComponent(last)}">查看審核進度</a>`;
+}
+
+/* ---------- 申請表 ---------- */
+$('#qList').innerHTML = QUESTIONS.map(q => {
+  const opts = q.type === 'agree' ? ['同意', '不同意'] : ['是', '否'];
+  return `<li class="q-item" data-f="${q.id}">
+    <div class="q-text">${esc(q.text)}</div>
+    <div class="choices">${opts.map(o => `<label class="choice"><input type="radio" name="${q.id}" value="${o}"><span>${o}</span></label>`).join('')}</div>
+    <div class="q-warn" hidden>⚠ 此選項可能不符合補助資格，仍可送出，由中心審核判定。</div>
+  </li>`;
+}).join('');
+
+$('.notes').innerHTML = $('.notes').innerHTML
+  .replace(/\$\{REVIEW_FEE\}/g, CONFIG.REVIEW_FEE).replace(/\$\{REG_FEE\}/g, CONFIG.REG_FEE.toLocaleString());
+
+const form = $('#applyForm');
+form.birthDate.max = todayYmd();
+
+function openApply(catKey) {
+  showView('apply');
+  if (currentCat !== catKey) {
+    currentCat = catKey;
+    const cat = CATEGORIES.find(c => c.key === catKey);
+    $('#catPill').textContent = `${cat.icon} 身分類別：${cat.key}`;
+    $('#extraTitle').innerHTML = `${cat.icon} ${esc(cat.key)}・補充資料`;
+    $('#extraFields').innerHTML = cat.extra.map(f => `
+      <label class="field" data-f="extra_${f.name}"><span>${esc(f.label)}</span>
+        <input type="${f.type}" name="extra_${f.name}" maxlength="100" placeholder="${esc(f.placeholder || '')}"></label>`).join('');
+  }
+  $('#fillDateText').textContent = rocShort(todayYmd());
+  sizeSignature();
+}
+
+form.addEventListener('change', e => {
+  const t = e.target;
+  const wrap = t.closest('[data-f]');
+  if (wrap) { wrap.classList.remove('has-err', 'autofilled'); wrap.querySelectorAll('.field-err').forEach(n => n.remove()); }
+  if (/^q\d+$/.test(t.name)) updateQWarn(t.name);
+  if (t.name === 'gender') $('#milReq').hidden = t.value !== '男';
+});
+form.addEventListener('input', e => {
+  const wrap = e.target.closest('[data-f]');
+  if (wrap && wrap.classList.contains('has-err')) { wrap.classList.remove('has-err'); wrap.querySelectorAll('.field-err').forEach(n => n.remove()); }
+});
+
+function updateQWarn(qid) {
+  const q = QUESTIONS.find(x => x.id === qid);
+  const val = (form.querySelector(`input[name="${qid}"]:checked`) || {}).value;
+  form.querySelector(`[data-f="${qid}"] .q-warn`).hidden = !(q.expect && val && val !== q.expect);
+}
+
+function collect() {
+  const fd = new FormData(form);
+  const d = { category: currentCat, fillDate: todayYmd(), extra: {} };
+  for (const [k, v] of fd.entries()) {
+    if (k.startsWith('extra_')) d.extra[k.slice(6)] = String(v).trim();
+    else if (k !== 'agree') d[k] = String(v).trim();
+  }
+  d.idNo = (d.idNo || '').toUpperCase();
+  d.mobile = (d.mobile || '').replace(/\D/g, '');
+  if (uploaded) d.fileName = uploaded.name;
+  return d;
+}
+
+function showErrors(errs) {
+  $$('.has-err', form).forEach(n => n.classList.remove('has-err'));
+  $$('.field-err', form).forEach(n => n.remove());
+  errs.forEach(({ field, msg }) => {
+    const wrap = form.querySelector(`[data-f="${field}"]`);
+    if (!wrap) return;
+    wrap.classList.add('has-err');
+    const p = document.createElement('div');
+    p.className = 'field-err';
+    p.textContent = msg;
+    wrap.appendChild(p);
+  });
+  const box = $('#errSummary');
+  box.hidden = !errs.length;
+  box.textContent = errs.length ? `還有 ${errs.length} 個欄位需要補齊或修正，請檢查標示紅色的地方。` : '';
+  if (errs.length) {
+    const first = form.querySelector('.has-err');
+    (first || box).scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const d = collect();
+  const errs = validateApplication(d);
+  if (!sigDirty) errs.push({ field: 'signature', msg: '請完成申請人親簽' });
+  if (!form.agree.checked) errs.push({ field: 'agree', msg: '請勾選同意聲明' });
+  showErrors(errs);
+  if (errs.length) return;
+
+  const issues = eligibilityIssues(d);
+  if (issues.length && !confirm(`您的資格審核有 ${issues.length} 項（${issues.join('、')}）可能不符合補助條件。\n\n仍要送出申請，由中心審核判定嗎？`)) return;
+
+  const btn = $('#submitBtn');
+  btn.disabled = true;
+  btn.textContent = '送出中…';
+  try {
+    const res = await API.call('submit', { data: d, signature: exportSignature(), file: uploaded });
+    mine.add(res.id, res.token);
+    form.reset();
+    clearSignature();
+    uploaded = null;
+    $('#uploadStatus').hidden = true;
+    $$('.autofilled', form).forEach(n => n.classList.remove('autofilled'));
+    location.hash = '#/pending/' + encodeURIComponent(res.id);
+  } catch (err) {
+    alert('送出失敗：' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '送出資格審核申請';
+  }
+});
+
+/* ---------- 上傳初審表 → 自動填入 ---------- */
+const dz = $('#dropzone');
+const fileInput = $('#fileInput');
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); fileInput.value = ''; });
+['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+function setUploadStatus(cls, html) {
+  const box = $('#uploadStatus');
+  box.hidden = false;
+  box.className = 'upload-status ' + cls;
+  box.innerHTML = html;
+}
+
+const FIELD_LABELS = {
+  name: '姓名', gender: '性別', marital: '婚姻狀況', birthDate: '出生日期', phoneHome: '市話', mobile: '行動電話',
+  idNo: '身分證號碼', address: '地址', military: '兵役', email: 'Mail', school: '學校', dept: '科系', motivation: '申請動機', confirm: '確認審核資格',
+};
+
+async function handleFile(file) {
+  if (file.size > 10 * 1024 * 1024) { setUploadStatus('err', '檔案超過 10MB，請壓縮後再上傳。'); return; }
+  setUploadStatus('working', `⏳ 正在讀取「${esc(file.name)}」…`);
+  try {
+    const text = await FormParser.extractText(file, msg => setUploadStatus('working', `⏳ ${esc(msg)}`));
+    const values = FormParser.parse(text);
+    const filled = applyValues(values);
+    uploaded = { name: file.name, dataUrl: await readAsDataUrl(file) };
+    const qCount = filled.filter(k => /^q\d+$/.test(k)).length;
+    const others = filled.filter(k => !/^q\d+$/.test(k)).map(k => FIELD_LABELS[k] || k);
+    if (!filled.length) {
+      setUploadStatus('err', `已上傳「${esc(file.name)}」，但沒有辨識到可帶入的資料，請直接在下方手動填寫。${rawDetails(text)}`);
+    } else {
+      const parts = [qCount ? `資格審核 ${qCount} 題` : '', ...others].filter(Boolean).join('、');
+      setUploadStatus('ok', `✅ 已從「${esc(file.name)}」自動帶入 <b>${filled.length}</b> 項資料（${esc(parts)}）。<br>請核對<b style="background:#fffbe6;padding:0 4px">黃色標示</b>的欄位，並補齊其餘欄位與簽名。${rawDetails(text)}`);
+    }
+  } catch (err) {
+    setUploadStatus('err', `無法讀取檔案：${esc(err.message)}。請直接在下方手動填寫。`);
+  }
+}
+
+function rawDetails(text) {
+  return `<details class="raw"><summary>查看辨識出的原始文字</summary><pre>${esc(String(text).trim().slice(0, 5000))}</pre></details>`;
+}
+
+function readAsDataUrl(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+}
+
+function applyValues(values) {
+  const filled = [];
+  Object.entries(values).forEach(([k, v]) => {
+    const els = form.querySelectorAll(`[name="${k}"]`);
+    if (!els.length || !v) return;
+    if (els[0].type === 'radio') {
+      const r = [...els].find(x => x.value === v);
+      if (!r) return;
+      r.checked = true;
+      if (/^q\d+$/.test(k)) updateQWarn(k);
+      if (k === 'gender') $('#milReq').hidden = v !== '男';
+    } else {
+      els[0].value = v;
+    }
+    const wrap = els[0].closest('[data-f]');
+    if (wrap) { wrap.classList.add('autofilled'); wrap.classList.remove('has-err'); wrap.querySelectorAll('.field-err').forEach(n => n.remove()); }
+    filled.push(k);
+  });
+  return filled;
+}
+
+/* ---------- 簽名板 ---------- */
+const pad = $('#sigPad');
+const ctx = pad.getContext('2d');
+let drawing = false;
+
+function sizeSignature() {
+  const r = pad.getBoundingClientRect();
+  if (!r.width) return;
+  const ratio = window.devicePixelRatio || 1;
+  const keep = sigDirty ? pad.toDataURL() : null;
+  pad.width = r.width * ratio;
+  pad.height = r.height * ratio;
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+  if (keep) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0, r.width, r.height); img.src = keep; }
+}
+window.addEventListener('resize', () => { if (!$('#view-apply').hidden) sizeSignature(); });
+
+function pt(e) { const r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+pad.addEventListener('pointerdown', e => {
+  drawing = true; pad.setPointerCapture(e.pointerId);
+  const [x, y] = pt(e); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + .1, y + .1); ctx.stroke();
+});
+pad.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const [x, y] = pt(e); ctx.lineTo(x, y); ctx.stroke();
+  if (!sigDirty) {
+    sigDirty = true; $('#sigHint').hidden = true;
+    const w = pad.closest('[data-f]'); w.classList.remove('has-err'); w.querySelectorAll('.field-err').forEach(n => n.remove());
+  }
+});
+['pointerup', 'pointercancel'].forEach(ev => pad.addEventListener(ev, () => { drawing = false; }));
+$('#sigClear').addEventListener('click', clearSignature);
+
+function clearSignature() {
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, pad.width, pad.height); ctx.restore();
+  sigDirty = false; $('#sigHint').hidden = false;
+}
+
+function exportSignature() {
+  // 輸出成白底、寬 600 的 PNG，檔案小又清楚
+  const out = document.createElement('canvas');
+  out.width = 600; out.height = Math.round(600 * pad.height / pad.width);
+  const c = out.getContext('2d');
+  c.fillStyle = '#fff'; c.fillRect(0, 0, out.width, out.height);
+  c.drawImage(pad, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
+/* ---------- 審核中 / 結果 ---------- */
+async function openPending(id) {
+  showView('pending');
+  const token = mine.token(id);
+  if (!token) { location.hash = '#/status/' + encodeURIComponent(id); return; }
+  const box = $('#pendingBox');
+  box.innerHTML = '<div class="card state-card"><div class="spinner"></div><p class="muted">讀取中…</p></div>';
+  const check = async () => {
+    try {
+      const { app } = await API.call('status', { id, token });
+      renderStatus(app, box);
+      if (app.status !== 'pending') clearInterval(pollTimer);
+    } catch (err) {
+      box.innerHTML = `<div class="card state-card"><h2>無法取得審核狀態</h2><p class="muted">${esc(err.message)}</p></div>`;
+    }
+  };
+  currentCheck = check;
+  await check();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden && location.hash.startsWith('#/pending/')) check(); }, CONFIG.POLL_SECONDS * 1000);
+}
+
+function renderStatus(app, box) {
+  if (app.status === 'pending') {
+    box.innerHTML = `
+      <div class="card state-card">
+        <div class="spinner"></div>
+        <h2>審核申請中，請稍後</h2>
+        <p class="muted" style="margin-top:6px">您的資格審核申請已送出，中心審核簽核完成後，此頁面會自動顯示通知書。</p>
+        <div class="app-id">申請編號：<b>${esc(app.id)}</b></div>
+        <div class="timeline">
+          <div class="tl done"><i>✓</i>送出申請</div>
+          <div class="tl now"><i>2</i>中心審核簽核</div>
+          <div class="tl"><i>3</i>核發通知書</div>
+        </div>
+        <p class="muted" style="font-size:13px;margin-top:16px">送出時間：${esc(fmtDateTime(app.createdAt))}　｜　身分類別：${esc(app.category)}<br>
+        請記下申請編號，之後可在「查詢審核進度」用申請編號＋身分證號碼查詢。${API.demo ? '<br><b>示範模式：請開啟 <a href="admin.html" target="_blank">管理後台</a> 進行簽核。</b>' : ''}</p>
+      </div>`;
+    return;
+  }
+  const head = {
+    approved: ['🎉', '恭喜您，資格審核已核准！', '請列印或下載以下核准通知書，並依說明辦理報名手續。'],
+    waitlist: ['⏳', '您已列入候補名單', '如有名額釋出，中心將依序通知您。'],
+    rejected: ['📮', '審核結果通知', '感謝您的申請，以下為審核結果。'],
+  }[app.status];
+  box.innerHTML = `
+    <div class="result-head">
+      <div class="big">${head[0]}</div>
+      <h2>${head[1]}</h2>
+      <p class="muted">${head[2]}</p>
+    </div>
+    ${renderNotice(app)}
+    <div class="notice-actions">
+      <button class="btn" onclick="window.print()">🖨️ 列印／另存 PDF</button>
+      <a class="btn btn-ghost" href="#/">回首頁</a>
+    </div>`;
+}
+
+$('#lookupForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const err = $('#lookupErr');
+  err.hidden = true;
+  const id = f.elements.appId.value.trim().toUpperCase();
+  try {
+    const { app } = await API.call('status', { id, idNo: f.elements.idNo.value.trim().toUpperCase() });
+    showView('pending');
+    renderStatus(app, $('#pendingBox'));
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.hidden = false;
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentCheck && location.hash.startsWith('#/pending/')) currentCheck();
+});
+
+$('#demoBanner').hidden = !API.demo;
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

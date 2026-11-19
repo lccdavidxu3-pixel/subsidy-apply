@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>管理後台｜高階原廠補助資格審核</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@500;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="container wide">
+    <a href="admin.html" class="logo">高階<span>原廠補助</span>・審核後台</a>
+    <nav class="nav"><a href="index.html" target="_blank">申請網站 ↗</a><a href="#" id="logoutBtn" hidden>登出</a></nav>
+  </div>
+</header>
+<div id="demoBanner" class="demo-banner" hidden></div>
+
+<!-- 登入 -->
+<section id="loginView">
+  <div class="card login">
+    <div class="card-h">🔐 管理者登入</div>
+    <form id="loginForm">
+      <label class="field"><span>管理密碼</span><input type="password" name="password" required autocomplete="current-password"></label>
+      <p id="loginErr" class="field-err" hidden style="margin-top:8px"></p>
+      <button class="btn" style="width:100%;margin-top:16px">登入</button>
+    </form>
+  </div>
+</section>
+
+<!-- 列表 -->
+<section id="mainView" hidden>
+  <div class="container wide">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <div class="tabs" id="catTabs"></div>
+      <select id="statusFilter">
+        <option value="">全部狀態</option>
+        <option value="pending" selected>審核中</option>
+        <option value="approved">核准</option>
+        <option value="waitlist">候補</option>
+        <option value="rejected">資格不符</option>
+      </select>
+      <input type="search" id="search" class="grow" placeholder="搜尋姓名、編號、手機、Email">
+      <button class="btn btn-ghost btn-sm" id="refreshBtn">↻ 重新整理</button>
+    </div>
+    <div class="table-wrap">
+      <table class="list">
+        <thead><tr><th>申請編號</th><th>申請時間</th><th>身分類別</th><th>姓名</th><th>手機</th><th>資格自評</th><th>狀態</th><th>審核結果</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:13px;margin:12px 0 40px">每 30 秒自動更新。</p>
+  </div>
+</section>
+
+<!-- 明細 / 簽核 -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="modalTitle"></h3><button class="x-btn" id="modalClose" aria-label="關閉">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script src="assets/common.js"></script>
+<script>
+'use strict';
+const PW_KEY = 'hs_admin_pw';
+let password = sessionStorage.getItem(PW_KEY) || '';
+let apps = [];
+let catFilter = '';
+let refreshTimer = null;
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+if (API.demo) {
+  $('#demoBanner').hidden = false;
+  $('#demoBanner').textContent = `示範模式：資料存在這台電腦的瀏覽器中。示範密碼：${CONFIG.DEMO_ADMIN_PASSWORD}`;
+}
+
+/* ---------- 登入 ---------- */
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  password = e.target.password.value;
+  $('#loginErr').hidden = true;
+  try {
+    await load();
+    sessionStorage.setItem(PW_KEY, password);
+    enterMain();
+  } catch (err) {
+    $('#loginErr').textContent = err.message;
+    $('#loginErr').hidden = false;
+  }
+});
+
+$('#logoutBtn').addEventListener('click', e => {
+  e.preventDefault();
+  sessionStorage.removeItem(PW_KEY);
+  location.reload();
+});
+
+function enterMain() {
+  $('#loginView').hidden = true;
+  $('#mainView').hidden = false;
+  $('#logoutBtn').hidden = false;
+  render();
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => { if (!document.hidden && $('#modal').hidden) load().then(render).catch(() => {}); }, 30000);
+}
+
+async function load() {
+  const res = await API.call('adminList', { password });
+  apps = res.apps;
+}
+
+/* ---------- 列表 ---------- */
+function render() {
+  const pendingOf = k => apps.filter(a => a.category === k && a.status === 'pending').length;
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="n">${apps.length}</div><div class="l">全部申請</div><div class="p">待審 ${apps.filter(a => a.status === 'pending').length}</div></div>
+    ${CATEGORIES.map(c => `<div class="stat"><div class="n">${apps.filter(a => a.category === c.key).length}</div><div class="l">${c.icon} ${esc(c.key)}</div><div class="p">待審 ${pendingOf(c.key)}</div></div>`).join('')}`;
+
+  $('#catTabs').innerHTML = [{ key: '', label: '全部' }].concat(CATEGORIES.map(c => ({ key: c.key, label: c.key })))
+    .map(t => `<button class="tab ${catFilter === t.key ? 'active' : ''}" data-cat="${esc(t.key)}">${esc(t.label)}<span class="c">${t.key ? apps.filter(a => a.category === t.key).length : apps.length}</span></button>`).join('');
+
+  const st = $('#statusFilter').value;
+  const q = $('#search').value.trim().toLowerCase();
+  const list = apps.filter(a =>
+    (!catFilter || a.category === catFilter) &&
+    (!st || a.status === st) &&
+    (!q || [a.id, a.name, a.mobile, a.email].some(v => String(v || '').toLowerCase().includes(q))));
+
+  $('#rows').innerHTML = list.length ? list.map(a => {
+    const r = a.review;
+    const result = r ? (r.result === 'rejected' ? '婉拒' : `${r.result === 'approved' ? '核准第' : '候補第'} ${esc(r.rank)} 名`) : '';
+    return `<tr>
+      <td class="mono">${esc(a.id)}</td>
+      <td>${esc(fmtDateTime(a.createdAt))}</td>
+      <td>${esc(a.category)}</td>
+      <td><b>${esc(a.name)}</b></td>
+      <td class="mono">${esc(a.mobile)}</td>
+      <td>${a.issues.length ? `<span class="warn" title="${esc(a.issues.join('、'))}">⚠ ${a.issues.length} 項</span>` : '<span class="ok">✓ 符合</span>'}</td>
+      <td><span class="badge ${STATUS[a.status].cls}">${STATUS[a.status].label}</span></td>
+      <td>${result}</td>
+      <td><button class="btn btn-sm ${a.status === 'pending' ? '' : 'btn-ghost'}" data-open="${esc(a.id)}">${a.status === 'pending' ? '審核簽核' : '檢視'}</button></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="9" class="empty">目前沒有符合條件的申請</td></tr>`;
+}
+
+$('#catTabs').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (b) { catFilter = b.dataset.cat; render(); } });
+$('#statusFilter').addEventListener('change', render);
+$('#search').addEventListener('input', render);
+$('#refreshBtn').addEventListener('click', async () => { await load(); render(); toast('已更新'); });
+$('#rows').addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openDetail(b.dataset.open); });
+
+/* ---------- 明細與簽核 ---------- */
+const modal = $('#modal');
+$('#modalClose').addEventListener('click', closeModal);
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+function closeModal() { modal.hidden = true; document.body.style.overflow = ''; }
+
+async function openDetail(id) {
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('#modalTitle').textContent = `申請 ${id}`;
+  $('#modalBody').className = 'modal-body single';
+  $('#modalBody').innerHTML = '<div class="card state-card"><div class="spinner"></div></div>';
+  try {
+    const { app } = await API.call('adminGet', { password, id });
+    renderDetail(app);
+  } catch (err) {
+    $('#modalBody').innerHTML = `<div class="card">${esc(err.message)}</div>`;
+  }
+}
+
+function suggestRank(result, cat) {
+  return apps.filter(a => a.status === result && a.category === cat).length + 1;
+}
+
+function renderDetail(app) {
+  const r = app.review || {};
+  const d = app.data;
+  $('#modalTitle').innerHTML = `${esc(d.name)}　<span class="badge ${STATUS[app.status].cls}">${STATUS[app.status].label}</span>　<span class="muted" style="font-size:14px;font-weight:400">${esc(app.id)}｜${esc(d.category)}｜送出 ${esc(fmtDateTime(app.createdAt))}</span>`;
+  $('#modalBody').className = 'modal-body';
+  const result = r.result || '';
+  const instOpts = ['6', '12', '18', '24', '其它'];
+  $('#modalBody').innerHTML = `
+    <div class="card" style="margin:0">
+      ${app.issues.length ? `<div class="issues-box">⚠ 資格自評有 ${app.issues.length} 項需注意：${esc(app.issues.join('、'))}（紅色標示）</div>` : ''}
+      ${renderApplicationSheet(app)}
+      ${app.fileUrl || d.fileName ? `<p style="margin-top:12px;font-size:14px">📎 申請人上傳的初審表：${app.fileUrl ? `<a href="${esc(app.fileUrl)}" target="_blank" rel="noopener" download="${esc(d.fileName || '')}">${esc(d.fileName || '開啟檔案')}</a>` : esc(d.fileName) + '（示範模式檔案過大未保存）'}</p>` : ''}
+    </div>
+    <div class="review-box">
+      <form class="card" id="reviewForm" style="margin:0">
+        <div class="card-h"><span class="num">三</span>專案類別（中心填寫）</div>
+        <label class="field"><span>申請專案課程類別</span><input type="text" name="courseType" value="${esc(r.courseType || '')}" list="courseList" placeholder="例：Autodesk AutoCAD 認證專班"></label>
+        <datalist id="courseList">${[...new Set(apps.map(a => a.review && a.review.courseType).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+        <div class="field"><span>分期期數</span>
+          <div class="choices">${instOpts.map(o => `<label class="choice"><input type="radio" name="installments" value="${o}" ${r.installments === o ? 'checked' : ''}><span>${o === '其它' ? '其它' : o + ' 期'}</span></label>`).join('')}</div>
+          <input type="text" name="installmentsOther" value="${esc(r.installmentsOther || '')}" placeholder="其它期數說明" ${r.installments === '其它' ? '' : 'hidden'}>
+        </div>
+
+        <div class="card-h" style="margin-top:22px"><span class="num">四</span>審核結果（原廠建議）</div>
+        <div class="result-opts">
+          <label class="result-opt" data-r="approved"><input type="radio" name="result" value="approved" ${result === 'approved' ? 'checked' : ''}>核准　第 <input type="number" min="1" name="rank_approved" value="${result === 'approved' ? esc(r.rank) : suggestRank('approved', d.category)}"> 名</label>
+          <label class="result-opt" data-r="waitlist"><input type="radio" name="result" value="waitlist" ${result === 'waitlist' ? 'checked' : ''}>待核　候補第 <input type="number" min="1" name="rank_waitlist" value="${result === 'waitlist' ? esc(r.rank) : suggestRank('waitlist', d.category)}"> 名</label>
+          <label class="result-opt" data-r="rejected"><input type="radio" name="result" value="rejected" ${result === 'rejected' ? 'checked' : ''}>資格不符・婉拒</label>
+        </div>
+        <div class="grid2" style="margin-top:14px">
+          <label class="field"><span>單位主管</span><input type="text" name="supervisor" value="${esc(r.supervisor || '')}"></label>
+          <label class="field"><span>經辦人</span><input type="text" name="handler" value="${esc(r.handler || localStorage.getItem('hs_handler') || '')}"></label>
+        </div>
+        <label class="field"><span>學習意願評分（1–10 分）</span><input type="number" name="score" min="1" max="10" value="${esc(r.score || '')}"></label>
+        <label class="field"><span>內部備註（申請人看不到）</span><textarea name="note" style="min-height:70px">${esc(r.note || '')}</textarea></label>
+        <p class="field-err" id="reviewErr" hidden style="margin-top:10px"></p>
+        <button class="btn btn-green btn-lg" style="width:100%;margin-top:16px">${app.review ? '更新簽核結果' : '送出簽核'}</button>
+        ${app.review ? `<button type="button" class="btn btn-ghost" id="viewNoticeBtn" style="width:100%;margin-top:10px">📄 檢視通知書（${esc(r.noticeNo)}）</button>` : ''}
+      </form>
+    </div>`;
+
+  const f = $('#reviewForm');
+  const syncSel = () => {
+    $$('.result-opt', f).forEach(o => { o.className = 'result-opt' + (o.querySelector('input[type=radio]').checked ? ' sel-' + o.dataset.r : ''); });
+    f.installmentsOther.hidden = !(f.querySelector('input[name=installments]:checked') || {}).value?.startsWith('其');
+  };
+  f.addEventListener('change', syncSel);
+  syncSel();
+  if ($('#viewNoticeBtn')) $('#viewNoticeBtn').addEventListener('click', () => showNotice(Object.assign({ name: d.name, category: d.category }, app)));
+
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = (f.querySelector('input[name=result]:checked') || {}).value;
+    const review = {
+      result: res,
+      rank: res && res !== 'rejected' ? f['rank_' + res].value.trim() : '',
+      courseType: f.courseType.value.trim(),
+      installments: (f.querySelector('input[name=installments]:checked') || {}).value || '',
+      installmentsOther: f.installmentsOther.value.trim(),
+      supervisor: f.supervisor.value.trim(),
+      handler: f.handler.value.trim(),
+      score: f.score.value.trim(),
+      note: f.note.value.trim(),
+    };
+    const err = $('#reviewErr');
+    const fail = m => { err.textContent = m; err.hidden = false; };
+    err.hidden = true;
+    if (!review.result) return fail('請選擇審核結果');
+    if (review.score && !(Number(review.score) >= 1 && Number(review.score) <= 10)) return fail('學習意願評分需為 1–10 分');
+    if (!review.handler) return fail('請填寫經辦人');
+    const label = { approved: `核准第 ${review.rank} 名`, waitlist: `候補第 ${review.rank} 名`, rejected: '資格不符・婉拒' }[review.result];
+    if (!confirm(`確定將「${d.name}」簽核為【${label}】？\n送出後申請人即可在網站上看到通知書。`)) return;
+    const btn = f.querySelector('button[type=submit], button:not([type])');
+    btn.disabled = true;
+    try {
+      const { app: pub } = await API.call('adminReview', { password, id: app.id, review });
+      localStorage.setItem('hs_handler', review.handler);
+      await load();
+      render();
+      toast('已完成簽核，申請人頁面將顯示通知書');
+      showNotice(pub);
+    } catch (ex) {
+      fail(ex.message);
+      btn.disabled = false;
+    }
+  });
+}
+
+function showNotice(pub) {
+  $('#modalTitle').textContent = `通知書預覽｜${pub.name}`;
+  $('#modalBody').className = 'modal-body single';
+  $('#modalBody').innerHTML = `${renderNotice(pub)}
+    <div class="notice-actions"><button class="btn" onclick="window.print()">🖨️ 列印通知書</button><button class="btn btn-ghost" id="backList">回到列表</button></div>`;
+  $('#backList').addEventListener('click', closeModal);
+}
+
+/* ---------- 啟動 ---------- */
+if (password) {
+  load().then(enterMain).catch(() => { sessionStorage.removeItem(PW_KEY); password = ''; });
+}
+</script>
+</body>
+</html>
