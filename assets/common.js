@@ -214,6 +214,13 @@ const DemoBackend = {
     return { ok: true, id, token };
   },
   status({ id, token, idNo }) {
+    if (!id && !token) {
+      const no = String(idNo || '').trim().toUpperCase();
+      if (!/^[A-Z][0-9]{9}$/.test(no)) throw new Error('請輸入正確的身分證號碼');
+      const list = this.load().filter(x => x.data.idNo === no).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      if (!list.length) throw new Error('查無此身分證號碼的申請');
+      return { ok: true, app: this.publicView(list[0]) };
+    }
     const a = this.load().find(x => x.id === String(id || '').trim().toUpperCase());
     if (!a) throw new Error('查無此申請編號');
     if (!(token && token === a.token) && !(idNo && String(idNo).trim().toUpperCase() === a.data.idNo)) throw new Error('申請編號與身分證號不符');

@@ -135,8 +135,7 @@
       <div class="card lookup">
         <div class="card-h">🔎 查詢審核進度</div>
         <form id="lookupForm">
-          <label class="field"><span>申請編號</span><input type="text" name="appId" placeholder="例：HS251119-1234" style="text-transform:uppercase" required></label>
-          <label class="field"><span>身分證號碼</span><input type="text" name="idNo" maxlength="10" style="text-transform:uppercase" required></label>
+          <label class="field"><span>身分證號碼</span><input type="text" name="idNo" maxlength="10" placeholder="A123456789" style="text-transform:uppercase" required></label>
           <p id="lookupErr" class="field-err" hidden style="margin-top:10px"></p>
           <button class="btn" style="width:100%;margin-top:16px">查詢</button>
         </form>
@@ -173,7 +172,7 @@ function route() {
   const [, view, arg] = decodeURIComponent(location.hash.slice(1) || '/').split('/');
   if (view === 'apply' && CATEGORIES.some(c => c.key === arg)) return openApply(arg);
   if (view === 'pending' && arg) return openPending(arg);
-  if (view === 'status') { showView('status'); if (arg) $('#lookupForm').elements.appId.value = arg; return; }
+  if (view === 'status') { showView('status'); return; }
   showView('home');
   renderMine();
 }
@@ -392,7 +391,7 @@ function renderStatus(app, box) {
           <div class="tl"><i>3</i>核發通知書</div>
         </div>
         <p class="muted" style="font-size:13px;margin-top:16px">送出時間：${esc(fmtDateTime(app.createdAt))}　｜　身分類別：${esc(app.category)}<br>
-        請記下申請編號，之後可在「查詢審核進度」用申請編號＋身分證號碼查詢。${API.demo ? '<br><b>示範模式：請開啟 <a href="admin.html" target="_blank">管理後台</a> 進行簽核。</b>' : ''}</p>
+        之後可在「查詢審核進度」輸入身分證號碼查詢。${API.demo ? '<br><b>示範模式：請開啟 <a href="admin.html" target="_blank">管理後台</a> 進行簽核。</b>' : ''}</p>
       </div>`;
     return;
   }
@@ -419,9 +418,8 @@ $('#lookupForm').addEventListener('submit', async e => {
   const f = e.target;
   const err = $('#lookupErr');
   err.hidden = true;
-  const id = f.elements.appId.value.trim().toUpperCase();
   try {
-    const { app } = await API.call('status', { id, idNo: f.elements.idNo.value.trim().toUpperCase() });
+    const { app } = await API.call('status', { idNo: f.elements.idNo.value.trim().toUpperCase() });
     showView('pending');
     renderStatus(app, $('#pendingBox'));
   } catch (ex) {

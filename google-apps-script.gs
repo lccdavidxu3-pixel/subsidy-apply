@@ -109,6 +109,15 @@ function submit(req) {
 }
 
 function status(req) {
+  // 只用身分證號碼查詢：回傳此身分證最新的一筆申請
+  if (!req.id && !req.token) {
+    const idNo = String(req.idNo || '').trim().toUpperCase();
+    if (!/^[A-Z][0-9]{9}$/.test(idNo)) throw new Error('請輸入正確的身分證號碼');
+    const list = loadRows().filter(r => r.data.idNo === idNo);
+    if (!list.length) throw new Error('查無此身分證號碼的申請');
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return { ok: true, app: publicView(list[0]) };
+  }
   const rec = findById(String(req.id || '').trim().toUpperCase());
   if (!rec) throw new Error('查無此申請編號');
   const byToken = req.token && req.token === rec.token;
