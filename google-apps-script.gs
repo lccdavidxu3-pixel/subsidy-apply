@@ -109,12 +109,14 @@ function submit(req) {
 }
 
 function status(req) {
-  // 只用身分證號碼查詢：回傳此身分證最新的一筆申請
+  // 身分證號碼＋手機末三碼查詢：回傳此身分證最新的一筆申請
   if (!req.id && !req.token) {
     const idNo = String(req.idNo || '').trim().toUpperCase();
+    const tail = String(req.mobileTail || '').replace(/\D/g, '');
     if (!/^[A-Z][0-9]{9}$/.test(idNo)) throw new Error('請輸入正確的身分證號碼');
-    const list = loadRows().filter(r => r.data.idNo === idNo);
-    if (!list.length) throw new Error('查無此身分證號碼的申請');
+    if (!/^\d{3}$/.test(tail)) throw new Error('請輸入手機末三碼');
+    const list = loadRows().filter(r => r.data.idNo === idNo && String(r.data.mobile || '').replace(/\D/g, '').slice(-3) === tail);
+    if (!list.length) throw new Error('查無申請，請確認身分證號碼與手機末三碼');
     list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return { ok: true, app: publicView(list[0]) };
   }

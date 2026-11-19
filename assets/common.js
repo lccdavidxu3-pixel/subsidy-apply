@@ -213,12 +213,14 @@ const DemoBackend = {
     this.save(list);
     return { ok: true, id, token };
   },
-  status({ id, token, idNo }) {
+  status({ id, token, idNo, mobileTail }) {
     if (!id && !token) {
       const no = String(idNo || '').trim().toUpperCase();
+      const tail = String(mobileTail || '').replace(/\D/g, '');
       if (!/^[A-Z][0-9]{9}$/.test(no)) throw new Error('請輸入正確的身分證號碼');
-      const list = this.load().filter(x => x.data.idNo === no).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      if (!list.length) throw new Error('查無此身分證號碼的申請');
+      if (!/^\d{3}$/.test(tail)) throw new Error('請輸入手機末三碼');
+      const list = this.load().filter(x => x.data.idNo === no && String(x.data.mobile || '').replace(/\D/g, '').slice(-3) === tail).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      if (!list.length) throw new Error('查無申請，請確認身分證號碼與手機末三碼');
       return { ok: true, app: this.publicView(list[0]) };
     }
     const a = this.load().find(x => x.id === String(id || '').trim().toUpperCase());
