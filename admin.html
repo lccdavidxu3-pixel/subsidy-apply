@@ -84,6 +84,7 @@ function toast(msg) {
 if (API.demo) {
   $('#demoBanner').hidden = false;
   $('#demoBanner').textContent = `示範模式：資料存在這台電腦的瀏覽器中。示範密碼：${CONFIG.DEMO_ADMIN_PASSWORD}`;
+  if (TEST_MODE) $('#demoBanner').innerHTML = `🧪 <b>測試模式</b>：資料只存在這台電腦的瀏覽器，不會送到正式系統。測試密碼：<b>${esc(CONFIG.DEMO_ADMIN_PASSWORD)}</b>　<a href="./">開啟測試申請網站</a>｜<a href="javascript:clearTestData()">清除測試資料</a>｜<a href="admin.html?demo=0">離開測試模式</a>`;
 }
 
 /* ---------- 登入 ---------- */

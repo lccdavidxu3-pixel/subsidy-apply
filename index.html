@@ -148,7 +148,7 @@
 <script src="assets/common.js"></script>
 <script>
 'use strict';
-const MINE_KEY = 'hs_my_apps';
+const MINE_KEY = TEST_MODE ? 'hs_my_apps_test' : 'hs_my_apps';
 let currentCat = null;
 let pollTimer = null;
 let sigDirty = false;
@@ -434,6 +434,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 $('#demoBanner').hidden = !API.demo;
+if (TEST_MODE) $('#demoBanner').innerHTML = '🧪 <b>測試模式</b>：資料只存在這台電腦的瀏覽器，不會送到正式系統。　<a href="admin.html">開啟測試後台</a>｜<a href="javascript:clearTestData()">清除測試資料</a>｜<a href="./?demo=0">離開測試模式</a>';
 window.addEventListener('hashchange', route);
 route();
 </script>

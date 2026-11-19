@@ -40,6 +40,7 @@ button { font: inherit; }
 .nav { display: flex; gap: 20px; font-size: 15px; }
 .nav a { color: #cfd3da; }
 .nav a:hover, .nav a.active { color: #fff; }
+.demo-banner a { color: #7a5410; text-decoration: underline; font-weight: 700; }
 .demo-banner { background: var(--amber-soft); color: #7a5410; font-size: 14px; text-align: center; padding: 8px 16px; border-bottom: 1px solid #f1dfb0; }
 
 /* ---------- Buttons / inputs ---------- */

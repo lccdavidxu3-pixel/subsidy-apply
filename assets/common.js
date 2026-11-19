@@ -34,6 +34,24 @@ const CONFIG = {
   },
 };
 
+/* 測試模式：網址加 ?demo=1 進入、?demo=0 離開。
+ * 測試模式下不連正式後端，資料只存在這台電腦的瀏覽器（申請網站與後台共用）。 */
+const TEST_MODE = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('demo');
+    if (q === '1') localStorage.setItem('hs_test_mode', '1');
+    if (q === '0') localStorage.removeItem('hs_test_mode');
+    return localStorage.getItem('hs_test_mode') === '1';
+  } catch (e) { return false; }
+})();
+if (TEST_MODE) CONFIG.API_URL = '';
+
+function clearTestData() {
+  localStorage.removeItem('hs_demo_apps');
+  localStorage.removeItem('hs_my_apps_test');
+  location.reload();
+}
+
 const CATEGORIES = [
   {
     key: '待業', icon: '🔍', desc: '目前未就業，正在尋找工作機會',
