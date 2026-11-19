@@ -19,13 +19,13 @@ const CONFIG = {
   // 核准通知單版面文字（可自行修改）
   NOTICE: {
     brand: '聯成', brandAccent: '電腦',
-    subOrg: '聯成電腦認證中心｜雲嘉南區認證中心',
+    subOrg: '聯成電腦認證中心｜桃竹認證中心',
     tagline: 'PROFESSIONAL TRAINING APPROVAL',
     planLine: '2026 原廠技能培訓提昇計畫・產業人才培訓補助',
     projectFull: '2026 原廠技能培訓提昇計畫－產業人才培訓補助乙案',
     badge: '2026 年度專案補助｜數位產業斜槓人才班・本梯次限額 30 名',
     quota: 30,                    // 本梯次名額，印章顯示「第 N / 30 名」
-    unit: '雲嘉南區認證中心',       // 專案審核單位
+    unit: '桃竹認證中心',       // 專案審核單位
     committee: '聯成電腦認證中心・專案審核委員會',
     plans: [
       { code: 'A', price: 2880, periods: 30, items: ['先修 AI 工具', 'AutoCAD', 'SketchUp'] },
