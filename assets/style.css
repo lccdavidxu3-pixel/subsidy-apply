@@ -102,7 +102,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(227,38,82,.2
 .page-head { padding: 28px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .page-head h1 { font-size: 26px; font-weight: 900; color: var(--strong); }
 .cat-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 14px; }
-.dropzone { border: 2px dashed #cfd3da; border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: .15s; background: #fafbfc; }
+.dropzone { display: block; border: 2px dashed #cfd3da; border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: .15s; background: #fafbfc; }
 .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: var(--accent-soft); }
 .dropzone .dz-icon { font-size: 34px; }
 .dropzone b { color: var(--strong); }
