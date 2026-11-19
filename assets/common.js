@@ -437,3 +437,22 @@ function renderOriginalForm(app) {
     </table>
   </article>`;
 }
+
+/* ---------------- 頁面內確認框（取代瀏覽器 confirm／alert，避免被瀏覽器擋掉） ---------------- */
+function askConfirm(message, { okText = '確定', cancelText = '取消', alertOnly = false } = {}) {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dlg';
+    wrap.innerHTML = `<div class="dlg-box" role="dialog" aria-modal="true">
+      <div class="dlg-msg"></div>
+      <div class="dlg-btns">${alertOnly ? '' : `<button type="button" class="btn btn-ghost" data-v="0">${esc(cancelText)}</button>`}
+        <button type="button" class="btn" data-v="1">${esc(okText)}</button></div></div>`;
+    wrap.querySelector('.dlg-msg').textContent = message;
+    const done = v => { wrap.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    wrap.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) done(b.dataset.v === '1'); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(wrap);
+    wrap.querySelector('[data-v="1"]').focus();
+  });
+}

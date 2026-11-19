@@ -259,7 +259,7 @@ function renderDetail(app) {
     if (review.score && !(Number(review.score) >= 1 && Number(review.score) <= 10)) return fail('學習意願評分需為 1–10 分');
     if (!review.handler) return fail('請填寫經辦人');
     const label = { approved: `核准第 ${review.rank} 名`, waitlist: `候補第 ${review.rank} 名`, rejected: '資格不符・婉拒' }[review.result];
-    if (!confirm(`確定將「${d.name}」簽核為【${label}】？\n送出後申請人即可在網站上看到通知書。`)) return;
+    if (!await askConfirm(`確定將「${d.name}」簽核為【${label}】？\n送出後申請人即可在網站上看到通知書。`, { okText: '確定送出' })) return;
     const btn = f.querySelector('button[type=submit], button:not([type])');
     btn.disabled = true;
     try {

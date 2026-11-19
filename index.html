@@ -288,7 +288,7 @@ form.addEventListener('submit', async e => {
   if (errs.length) return;
 
   const issues = eligibilityIssues(d);
-  if (issues.length && !confirm(`您的資格審核有 ${issues.length} 項（${issues.join('、')}）可能不符合補助條件。\n\n仍要送出申請，由中心審核判定嗎？`)) return;
+  if (issues.length && !await askConfirm(`您的資格審核有 ${issues.length} 項（${issues.join('、')}）可能不符合補助條件。\n\n仍要送出申請，由中心審核判定嗎？`)) return;
 
   const btn = $('#submitBtn');
   btn.disabled = true;
@@ -300,7 +300,7 @@ form.addEventListener('submit', async e => {
     clearSignature();
     location.hash = '#/pending/' + encodeURIComponent(res.id);
   } catch (err) {
-    alert('送出失敗：' + err.message);
+    askConfirm('送出失敗：' + err.message, { alertOnly: true });
   } finally {
     btn.disabled = false;
     btn.textContent = '送出資格審核申請';
