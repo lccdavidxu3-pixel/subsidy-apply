@@ -196,7 +196,7 @@ function renderDetail(app) {
   $('#modalBody').innerHTML = `
     <div class="card" style="margin:0">
       ${app.issues.length ? `<div class="issues-box">⚠ 資格自評有 ${app.issues.length} 項需注意：${esc(app.issues.join('、'))}（紅色標示）</div>` : ''}
-      <div class="form-tools"><span class="muted" style="font-size:13px">依紙本「資格審核表」格式自動填寫${app.review ? '（含三、四欄審核結果）' : '，簽核後會帶入三、四欄'}</span><button type="button" class="btn btn-sm" onclick="window.print()">🖨️ 列印審核表</button></div>
+      <div class="form-tools"><span class="muted" style="font-size:13px">依紙本「資格審核表」格式自動填寫${app.review ? '（含三、四欄審核結果）' : '，簽核後會帶入三、四欄'}</span><button type="button" class="btn btn-sm" onclick="printDoc('#formDoc')">🖨️ 列印審核表（A4）</button></div>
       ${renderOriginalForm(app)}
       ${app.fileUrl || d.fileName ? `<p style="margin-top:12px;font-size:14px">📎 申請人上傳的初審表：${app.fileUrl ? `<a href="${esc(app.fileUrl)}" target="_blank" rel="noopener" download="${esc(d.fileName || '')}">${esc(d.fileName || '開啟檔案')}</a>` : esc(d.fileName) + '（示範模式檔案過大未保存）'}</p>` : ''}
     </div>
@@ -289,7 +289,7 @@ function showNotice(pub) {
   $('#modalTitle').textContent = `通知書預覽｜${pub.name}`;
   $('#modalBody').className = 'modal-body single';
   $('#modalBody').innerHTML = `${renderNotice(pub)}
-    <div class="notice-actions"><button class="btn" onclick="window.print()">🖨️ 列印通知書</button><button class="btn btn-ghost" id="backList">回到列表</button></div>`;
+    <div class="notice-actions"><button class="btn" onclick="printDoc('#noticeDoc')">🖨️ 列印通知書</button><button class="btn btn-ghost" id="backList">回到列表</button></div>`;
   $('#backList').addEventListener('click', closeModal);
 }
 

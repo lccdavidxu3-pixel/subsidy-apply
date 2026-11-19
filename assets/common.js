@@ -456,3 +456,35 @@ function askConfirm(message, { okText = '確定', cancelText = '取消', alertOn
     wrap.querySelector('[data-v="1"]').focus();
   });
 }
+
+/* ---------------- 列印：只印指定文件，自動縮放成一頁 A4 直式 ---------------- */
+function printDoc(selector) {
+  const src = document.querySelector(selector);
+  if (!src) return;
+  let area = document.getElementById('printArea');
+  if (!area) { area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
+  const clone = src.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.zoom = 1;
+  area.innerHTML = '';
+  area.appendChild(clone);
+
+  // 先在螢幕外量出原尺寸，再算出塞進 A4 可列印範圍（194mm × 281mm）的縮放比例
+  const MM = 96 / 25.4;
+  const pageW = 194 * MM;
+  const pageH = 281 * MM - 4;
+  area.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;width:' + pageW + 'px';
+  const isForm = clone.classList.contains('of');
+  if (isForm) { clone.style.padding = '0'; clone.style.border = '0'; }
+  const w = isForm ? clone.offsetWidth : pageW;
+  const zoomW = pageW / w;
+  clone.style.zoom = zoomW;
+  const h = clone.getBoundingClientRect().height;
+  clone.style.zoom = Math.min(zoomW, zoomW * pageH / h);
+  area.style.cssText = '';
+
+  document.body.classList.add('printing');
+  const cleanup = () => { document.body.classList.remove('printing'); area.innerHTML = ''; window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(() => window.print(), 50);
+}
