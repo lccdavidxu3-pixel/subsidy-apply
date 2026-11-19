@@ -226,6 +226,39 @@ table.list .mono { font-family: Consolas, monospace; }
 .login { max-width: 380px; margin: 80px auto; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111318; color: #fff; padding: 10px 20px; border-radius: 10px; z-index: 80; font-size: 14px; }
 
+
+/* ---------- 原版格式審核表 ---------- */
+.of { background: #fff; color: #111; width: 780px; max-width: none; margin: 0 auto; padding: 22px 26px; border: 1px solid var(--border); font-family: "Noto Serif TC", "PMingLiU", serif; font-size: 13.5px; line-height: 1.55; }
+.of-title { text-align: center; color: #1f3fbf; font-size: 26px; letter-spacing: 3px; font-weight: 500; }
+.of-note { font-size: 12.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
+.of-id { color: #666; font-family: "Noto Sans TC", sans-serif; font-size: 11.5px; }
+.of-bar { background: #d4f5c8; color: #1f3fbf; font-size: 16px; padding: 1px 6px; margin: 6px 0 4px; display: flex; justify-content: space-between; }
+.of-bar b { color: #1f3fbf; }
+.of-q { width: 100%; border-collapse: collapse; }
+.of-q td { padding: 1px 2px; vertical-align: top; }
+.of-n { width: 22px; }
+.of-opt { white-space: nowrap; width: 62px; }
+.of-q tr.of-bad td { background: #fde2e2; }
+.of-box { display: inline-block; width: 1.15em; text-align: center; font-family: "Segoe UI Symbol", "Noto Sans TC", sans-serif; }
+.of-logos { display: block; width: 100%; margin: 8px 0 4px; }
+.of-t { width: 100%; border-collapse: collapse; }
+.of-t td { border: 1px solid #333; padding: 3px 5px; }
+.of-t b { color: #1f3fbf; font-weight: 500; }
+.of-val { display: inline-block; min-width: 1.6em; padding: 0 3px; color: #0b2a8a; font-family: "Noto Sans TC", sans-serif; font-weight: 700; text-align: center; }
+.of-small { font-size: 12.5px; margin-top: 2px; }
+.of-red { color: #d00; font-size: 12.5px; margin-top: 2px; }
+.of-motive { border-bottom: 2px solid #d00; min-height: 44px; padding: 4px 6px; color: #0b2a8a; font-family: "Noto Sans TC", sans-serif; font-weight: 500; }
+.of-sign { text-align: right; margin: 6px 0; display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; }
+.of-sign img { height: 52px; border-bottom: 1px solid #333; }
+.of-line { display: inline-block; width: 160px; border-bottom: 1px solid #333; }
+.of-c { padding: 2px 6px; }
+.of-r { width: 100%; border-collapse: collapse; border: 3px solid #111; margin-top: 6px; }
+.of-r td { border: 1px solid #333; padding: 6px 8px; text-align: center; width: 33.3%; }
+.of-r .of-big { text-align: left; font-size: 17px; font-weight: 700; height: 70px; vertical-align: top; border-bottom: 1px solid #333; }
+.of-r .of-h td { font-weight: 700; }
+.of-r .of-s td { height: 40px; color: #0b2a8a; font-family: "Noto Sans TC", sans-serif; font-weight: 700; font-size: 16px; }
+.form-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+
 @media (max-width: 860px) {
   .cat-grid, .steps { grid-template-columns: 1fr 1fr; }
   .stats { grid-template-columns: repeat(3, 1fr); }
@@ -241,10 +274,13 @@ table.list .mono { font-family: Consolas, monospace; }
   .stats { grid-template-columns: 1fr 1fr; }
 }
 
+@page { size: A4; margin: 8mm; }
 @media print {
   body { background: #fff; }
   body * { visibility: hidden; }
-  #noticeDoc, #noticeDoc * { visibility: visible; }
+  #noticeDoc, #noticeDoc *, #formDoc, #formDoc * { visibility: visible; }
+  #formDoc { zoom: .9 !important; position: absolute; left: 0; top: 0; width: 100%; max-width: none; border: 0; padding: 0; font-size: 12.5px; }
+  #formDoc .of-q tr.of-bad td { background: none; }
   #noticeDoc { position: absolute; left: 0; top: 0; width: 100%; max-width: none; border: 0; box-shadow: none; padding: 20mm 18mm; }
   .modal { position: static; overflow: visible; background: none; }
 }

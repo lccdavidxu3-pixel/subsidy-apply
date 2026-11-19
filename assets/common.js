@@ -386,3 +386,54 @@ function renderStamp(word, iso) {
     </g>
   </svg>`;
 }
+
+/* ---------------- 原版格式審核表（依紙本初審表排版，可列印） ---------------- */
+function renderOriginalForm(app) {
+  const d = app.data || {};
+  const r = app.review || {};
+  const box = (on) => `<span class="of-box">${on ? '☑' : '□'}</span>`;
+  const opt = (val, label) => `${box(d[val[0]] === val[1])}${label || val[1]}`;
+  const ymd = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? [Number(m[1]) - 1911, Number(m[2]), Number(m[3])] : ['', '', '']; };
+  const [fy, fm, fd] = ymd(d.fillDate);
+  const [by, bm, bd] = ymd(d.birthDate);
+  const v = (s) => `<span class="of-val">${esc(s || '')}</span>`;
+  const qRows = QUESTIONS.map((q, i) => {
+    const opts = q.type === 'agree' ? ['同意', '不同意'] : ['是', '否'];
+    const bad = q.expect && d[q.id] && d[q.id] !== q.expect;
+    return `<tr class="${bad ? 'of-bad' : ''}"><td class="of-n">${i + 1}.</td><td class="of-qt">${esc(q.text)}</td>
+      ${opts.map(o => `<td class="of-opt">${box(d[q.id] === o)}${o}</td>`).join('')}</tr>`;
+  }).join('');
+  const inst = ['6', '12', '18', '24'].map(n => `${box(r.installments === n)}${n} 期`).join('　');
+  return `
+  <article class="of" id="formDoc">
+    <h1 class="of-title">${esc(CONFIG.PROGRAM_NAME)}資格審核表</h1>
+    <div class="of-note">☞說明：以下各欄請詳實填寫，經查證如有虛偽不實者，視同放棄並自行負責。<span class="of-id">申請編號：${esc(app.id || '')}｜身分類別：${esc(d.category || '')}</span></div>
+    <div class="of-bar"><span>一.資格審核</span><span>■填表日期：${v(fy)} 年 ${v(fm)} 月 ${v(fd)} 日</span></div>
+    <table class="of-q">${qRows}</table>
+    <img class="of-logos" src="assets/img/partners.png" alt="原廠授權訓練中心">
+    <div class="of-bar">二.填寫個人基本資料</div>
+    <table class="of-t">
+      <tr><td><b>■姓　　名：</b>${v(d.name)}</td><td><b>■性　　別：</b>${opt(['gender', '男'])}　${opt(['gender', '女'])}</td><td><b>■婚姻狀況：</b>${opt(['marital', '已婚'])}　${opt(['marital', '未婚'])}</td></tr>
+      <tr><td><b>■出生日期：</b>${v(by)} 年 ${v(bm)} 月 ${v(bd)} 日</td><td colspan="2"><b>■聯絡電話：</b>(H) ${v(d.phoneHome)}　（行動電話）${v(d.mobile)}</td></tr>
+      <tr><td><b>■身份證號碼：</b>${v(d.idNo)}</td><td colspan="2"><b>■聯絡地址：</b>${v(d.address)}</td></tr>
+      <tr><td><b>■兵役狀況：</b>${opt(['military', '未役'])} ${opt(['military', '役畢'])} ${opt(['military', '免役'])}</td><td colspan="2"><b>■Mail：</b>${v(d.email)}</td></tr>
+      <tr><td><b>■最高學歷：</b>${v(d.school)}（學校）</td><td colspan="2"><b>■科　系：</b>${v(d.dept)}</td></tr>
+    </table>
+    <div class="of-small">＊應繳證件：（一）身份證件　（二）審核費手續費 ${CONFIG.REVIEW_FEE} 元（若審核通過需繳交報名費 ${CONFIG.REG_FEE} 元，可扣抵手續費 ${CONFIG.REVIEW_FEE} 元）</div>
+    <div class="of-small">＊您是否以充份了解整個訓練內容、學員權益…等，且已確定審核資格：${opt(['confirm', '是'])}　${opt(['confirm', '不是'])}</div>
+    <div class="of-small">＊請培訓申請人勿惡意取消，如有此狀況將列入原廠及企業之黑名單，爾後將影響面試機會。</div>
+    <div class="of-red">※此專案是針對就業、外包及考照能力的提升。請問您為何會想申請專案？</div>
+    <div class="of-motive">${esc(d.motivation || '').replace(/\n/g, '<br>')}</div>
+    <div class="of-sign">申請人親簽：${app.signature ? `<img src="${esc(app.signature)}" alt="簽名">` : '<span class="of-line"></span>'}</div>
+    <div class="of-bar">三.專案類別 <b>（中心填寫）</b></div>
+    <div class="of-c">●　申請專案課程類別：${v(r.courseType)}</div>
+    <div class="of-c">●　分期期數：${inst}　${box(r.installments === '其它')}其它 ${v(r.installments === '其它' ? r.installmentsOther : '')}</div>
+    <div class="of-bar">四.審核結果 <b>（原廠建議）</b></div>
+    <table class="of-r">
+      <tr><td colspan="2" class="of-big">${box(r.result === 'approved')}核准　第 ${v(r.result === 'approved' ? r.rank : '')} 名</td>
+          <td class="of-big">${box(r.result === 'waitlist')}待核　候補第 ${v(r.result === 'waitlist' ? r.rank : '')} 名<br>${box(r.result === 'rejected')}資格不符・婉拒</td></tr>
+      <tr class="of-h"><td>單位主管</td><td>經辦人</td><td>學習意願評分（1-10 分）</td></tr>
+      <tr class="of-s"><td>${esc(r.supervisor || '')}</td><td>${esc(r.handler || '')}</td><td>${esc(r.score || '')}</td></tr>
+    </table>
+  </article>`;
+}
