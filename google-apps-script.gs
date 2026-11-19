@@ -3,7 +3,9 @@
  *
  * 設定步驟：
  * 1. 新建一個 Google 試算表 →「擴充功能 → Apps Script」，把這整份貼上（取代原本的內容）。
- * 2. 左側「專案設定（齒輪）→ 指令碼屬性」新增：ADMIN_PASSWORD = 你的後台密碼
+ * 2. 左側「專案設定（齒輪）→ 指令碼屬性」新增：
+ *      ADMIN_PASSWORD    = 你的後台密碼
+ *      ANTHROPIC_API_KEY = Claude API 金鑰（選填；有設定才會用 AI 辨識手寫／掃描的初審表）
  * 3. 右上「部署 → 新增部署作業 → 類型：網頁應用程式」
  *      執行身分：我　／　誰可以存取：所有人 → 部署，第一次會要求授權（試算表 + 雲端硬碟）。
  * 4. 複製「網頁應用程式網址」，貼到 assets/common.js 最上面的 CONFIG.API_URL。
@@ -41,6 +43,7 @@ function doPost(e) {
     switch (req.action) {
       case 'submit': return json(submit(req));
       case 'status': return json(status(req));
+      case 'extract': return json(extract(req));
       case 'adminList': requireAdmin(req); return json(adminList());
       case 'adminGet': requireAdmin(req); return json(adminGet(req));
       case 'adminReview': requireAdmin(req); return json(adminReview(req));
@@ -103,6 +106,94 @@ function status(req) {
   const byIdNo = req.idNo && String(req.idNo).trim().toUpperCase() === rec.data.idNo;
   if (!byToken && !byIdNo) throw new Error('申請編號與身分證號不符');
   return { ok: true, app: publicView(rec) };
+}
+
+/* ---------------- AI 辨識初審表（手寫／掃描） ---------------- */
+
+const AI_MODEL = 'claude-opus-5-5';
+const AI_LIMIT_PER_10MIN = 40; // 全站每 10 分鐘最多辨識次數，避免被濫用
+
+function extract(req) {
+  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) return { ok: false, error: 'AI 辨識未設定', code: 'NO_AI' };
+
+  const m = /^data:([\w\/+.\-]+);base64,(.+)$/.exec(String((req.file || {}).dataUrl || ''));
+  if (!m) throw new Error('檔案格式錯誤');
+  const mime = m[1];
+  if (m[2].length > 14000000) throw new Error('檔案太大，請小於 10MB');
+  let block;
+  if (mime === 'application/pdf') block = { type: 'document', source: { type: 'base64', media_type: mime, data: m[2] } };
+  else if (/^image\/(jpeg|png|gif|webp)$/.test(mime)) block = { type: 'image', source: { type: 'base64', media_type: mime, data: m[2] } };
+  else throw new Error('AI 辨識只支援 PDF 或圖片');
+
+  // 簡單限流
+  const cache = CacheService.getScriptCache();
+  const slot = 'ai_' + Math.floor(Date.now() / 600000);
+  const used = Number(cache.get(slot) || 0);
+  if (used >= AI_LIMIT_PER_10MIN) throw new Error('目前辨識人數較多，請稍後再試或直接手動填寫');
+  cache.put(slot, String(used + 1), 900);
+
+  const yn = { type: 'string', enum: ['是', '否', ''] };
+  const agree = { type: 'string', enum: ['同意', '不同意', ''] };
+  const str = { type: 'string' };
+  const props = {
+    q1: yn, q2: yn, q3: yn, q4: yn, q5: yn, q6: yn, q7: yn, q8: agree, q9: agree, q10: agree,
+    name: str, gender: { type: 'string', enum: ['男', '女', ''] }, marital: { type: 'string', enum: ['已婚', '未婚', ''] },
+    birthDate: str, phoneHome: str, mobile: str, idNo: str, address: str,
+    military: { type: 'string', enum: ['未役', '役畢', '免役', ''] }, email: str, school: str, dept: str,
+    motivation: str, confirm: { type: 'string', enum: ['是', '不是', ''] },
+    uncertain: { type: 'array', items: { type: 'string' } },
+  };
+  const prompt = [
+    '這是一份「高階原廠補助資格審核表」，可能是手寫後掃描或拍照。請讀出申請人填寫的內容並依 JSON 格式回傳。',
+    '規則：',
+    '- q1~q10 對應「一.資格審核」第 1~10 題，看勾選（✓、V、☑、■、塗黑、圈選）在哪個選項；看不出來就填空字串。',
+    '- confirm：「已確定審核資格」後面勾選的是「是」或「不是」。',
+    '- birthDate 轉成西元 YYYY-MM-DD（民國年 + 1911，例如 84年12月12日 → 1995-12-12）。',
+    '- mobile 只留數字（09 開頭 10 碼）；phoneHome 保留原樣（含區碼、- 號）。',
+    '- idNo 為 1 個英文字母 + 9 個數字，英文大寫。',
+    '- school 只填學校名稱（不要「(學校)」字樣）；dept 為科系。',
+    '- motivation 為「為何會想申請專案」下方手寫的整段文字，保留原意、加上標點。',
+    '- 只讀申請人填寫的部分；「三.專案類別」「四.審核結果」是中心填寫的，忽略。',
+    '- 沒填或完全無法辨識的欄位填空字串，不要猜。',
+    '- uncertain：列出你辨識沒把握（字跡潦草、可能讀錯）的欄位名稱。',
+  ].join('\n');
+
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2026-10-21',
+      'anthropic-beta': 'server-side-fallback-2026-07-01',
+    },
+    payload: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: 16000,
+      fallbacks: 'default',
+      output_config: {
+        effort: 'low',
+        format: { type: 'json_schema', schema: { type: 'object', properties: props, required: Object.keys(props), additionalProperties: false } },
+      },
+      messages: [{ role: 'user', content: [block, { type: 'text', text: prompt }] }],
+    }),
+  });
+
+  const code = res.getResponseCode();
+  const body = JSON.parse(res.getContentText() || '{}');
+  if (code !== 200) {
+    console.error('Claude API ' + code + ': ' + res.getContentText());
+    throw new Error(code === 429 || code === 529 ? 'AI 辨識忙碌中，請稍後再試' : 'AI 辨識失敗（' + code + '）');
+  }
+  if (body.stop_reason === 'refusal') throw new Error('AI 無法辨識這份檔案，請手動填寫');
+  const text = (body.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  let values;
+  try { values = JSON.parse(text); } catch (e) { throw new Error('AI 辨識結果格式錯誤，請手動填寫'); }
+  const uncertain = Array.isArray(values.uncertain) ? values.uncertain : [];
+  delete values.uncertain;
+  Object.keys(values).forEach(k => { values[k] = String(values[k] || '').trim(); if (!values[k]) delete values[k]; });
+  return { ok: true, values: values, uncertain: uncertain };
 }
 
 /* ---------------- 管理後台 ---------------- */

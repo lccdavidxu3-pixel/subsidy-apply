@@ -72,6 +72,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(227,38,82,.2
 .has-err .choice span { border-color: #f0b3b3; }
 .autofilled input, .autofilled textarea, .autofilled select { background: #fffbe6; border-color: #f0d36b; }
 .autofilled .choice input:checked + span { box-shadow: 0 0 0 3px #f6df8a; }
+.unsure input, .unsure textarea { background: #fff1e3; border-color: #f2a65a; }
+.unsure .choice input:checked + span { box-shadow: 0 0 0 3px #f7b97a; }
+.unsure > span::after, .q-item.unsure .q-text::after { content: "（請確認）"; color: #c05621; font-weight: 700; font-size: 12px; margin-left: 4px; }
 
 /* ---------- Cards ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin-bottom: 20px; }
