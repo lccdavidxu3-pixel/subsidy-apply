@@ -370,6 +370,12 @@ table.list .mono { font-family: Consolas, monospace; }
   .nt-checks > div:nth-child(even) { border-left: 0; }
   .nt-checks > div:nth-child(2) { border-top: 1px solid #edf0f5; }
 }
+.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; }
+.plan-row b { flex: 0 0 100%; }
+.plan-row label { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 1 1 150px; }
+.plan-row label:nth-of-type(2) { flex: 0 1 110px; }
+.plan-row input[type=number] { flex: 1; min-width: 0; width: auto; padding: 6px 8px; }
+.plan-row .plan-total { flex: 0 0 100%; font-size: 13px; }
 #printArea { display: none; }
 @media print {
   html, body { background: #fff !important; overflow: visible !important; height: auto !important; }

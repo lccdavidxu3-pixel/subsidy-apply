@@ -172,6 +172,10 @@ function adminReview(req) {
     handler: clean(r.handler, 30),
     score: clean(r.score, 3),
     note: clean(r.note, 1000),
+    planAPrice: clean(r.planAPrice, 8).replace(/\D/g, ''),
+    planAPeriods: clean(r.planAPeriods, 4).replace(/\D/g, ''),
+    planBPrice: clean(r.planBPrice, 8).replace(/\D/g, ''),
+    planBPeriods: clean(r.planBPeriods, 4).replace(/\D/g, ''),
   };
   if (RESULTS.indexOf(review.result) === -1) throw new Error('請選擇審核結果');
   if (review.result !== 'rejected' && !/^\d+$/.test(review.rank)) throw new Error('請填寫名次');
@@ -317,6 +321,7 @@ function publicView(rec) {
       result: r.result, rank: r.rank, courseType: r.courseType, installments: r.installments,
       installmentsOther: r.installmentsOther, supervisor: r.supervisor, handler: r.handler,
       noticeNo: r.noticeNo, reviewedAt: r.reviewedAt, score: r.score,
+      planAPrice: r.planAPrice, planAPeriods: r.planAPeriods, planBPrice: r.planBPrice, planBPeriods: r.planBPeriods,
     } : null,
   };
 }

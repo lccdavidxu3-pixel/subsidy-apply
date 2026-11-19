@@ -190,6 +190,7 @@ const DemoBackend = {
         result: r.result, rank: r.rank, courseType: r.courseType, installments: r.installments,
         installmentsOther: r.installmentsOther, supervisor: r.supervisor, handler: r.handler,
         noticeNo: r.noticeNo, reviewedAt: r.reviewedAt, score: r.score,
+        planAPrice: r.planAPrice, planAPeriods: r.planAPeriods, planBPrice: r.planBPrice, planBPeriods: r.planBPeriods,
       } : null,
     };
   },
@@ -345,6 +346,13 @@ function rocYmd(iso) {
   return isNaN(d) ? '' : `${d.getFullYear() - 1911} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
 }
 
+// 方案金額：後台有填就用後台的，沒填用 CONFIG.NOTICE.plans 的預設值
+function planAmount(p, r) {
+  const price = Number((r || {})['plan' + p.code + 'Price']) || p.price;
+  const periods = Number((r || {})['plan' + p.code + 'Periods']) || p.periods;
+  return Object.assign({}, p, { price, periods });
+}
+
 function renderNotice(app) {
   const N = CONFIG.NOTICE;
   const r = app.review || {};
@@ -370,7 +378,7 @@ function renderNotice(app) {
   const money = (n) => 'NT$ ' + Number(n).toLocaleString();
   const plans = ok ? `
     <h3 class="nt-h">核定補助方案</h3>
-    <div class="nt-plans">${N.plans.map(p => `
+    <div class="nt-plans">${N.plans.map(p => planAmount(p, r)).map(p => `
       <div class="nt-plan${p.featured ? ' nt-feat' : ''}">
         ${p.tag ? `<span class="nt-tag">${esc(p.tag)}</span>` : ''}
         <div class="nt-pcode">PLAN ${esc(p.code)}</div>
